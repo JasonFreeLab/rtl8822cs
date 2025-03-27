@@ -204,9 +204,11 @@ u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0))
 	if (started) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))
-		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false, punct_bitmap);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || defined(CONFIG_MLD_KERNEL_PATCH)
+#if defined(CONFIG_MLD_KERNEL_PATCH)
+		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))
+		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false, 0);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
 		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0))
 
@@ -230,8 +232,8 @@ u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset,
 		goto exit;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))
-	cfg80211_ch_switch_notify(adapter->pnetdev, &chdef, 0, punct_bitmap);
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2)) || defined(CONFIG_MLD_KERNEL_PATCH)
+	cfg80211_ch_switch_notify(adapter->pnetdev, &chdef, 0, 0);
+#elif (defined(CONFIG_MLD_KERNEL_PATCH) || (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2)))
 	cfg80211_ch_switch_notify(adapter->pnetdev, &chdef, 0);
 #else
 	cfg80211_ch_switch_notify(adapter->pnetdev, &chdef);
@@ -912,7 +914,7 @@ check_bss:
 		#endif
 
 		#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-		#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0) || defined(CONFIG_MLD_KERNEL_PATCH)
+		#if (defined(CONFIG_MLD_KERNEL_PATCH) || LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
 		roam_info.links[0].bssid = cur_network->network.MacAddress;
 		#else	
 		roam_info.bssid = cur_network->network.MacAddress;
@@ -4993,6 +4995,11 @@ static int rtw_cfg80211_add_monitor_if(_adapter *padapter, char *name, struct ne
 		goto out;
 	}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
+	mon_ndev->min_mtu = WLAN_MIN_ETHFRM_LEN;
+	mon_ndev->mtu = WLAN_DATA_MAXLEN;
+	mon_ndev->max_mtu = WLAN_DATA_MAXLEN;
+#endif
 	mon_ndev->type = ARPHRD_IEEE80211_RADIOTAP;
 	strncpy(mon_ndev->name, name, IFNAMSIZ);
 	mon_ndev->name[IFNAMSIZ - 1] = 0;
@@ -5502,6 +5509,7 @@ static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *nd
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
 	struct cfg80211_beacon_data *info = &params->beacon;
 #endif
+
 	RTW_INFO(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 
 #ifdef not_yet

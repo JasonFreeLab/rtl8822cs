@@ -86,7 +86,7 @@
 
 
 /* xmit extension buff defination */
-#define MAX_XMIT_EXTBUF_SZ	(1536)
+#define MAX_XMIT_EXTBUF_SZ	(4096)
 
 #ifdef CONFIG_SINGLE_XMIT_BUF
 	#define NR_XMIT_EXTBUFF	(1)
@@ -479,7 +479,7 @@ struct pkt_attrib {
 	u8 icmp_pkt;
 	u8 hipriority_pkt; /* high priority packet */
 
-#ifdef CONFIG_BEAMFORMING
+#if defined(CONFIG_BEAMFORMING) || defined(CONFIG_BEAMFORMING_MONITOR)
 	u16 txbf_p_aid;/*beamforming Partial_AID*/
 	u16 txbf_g_id;/*beamforming Group ID*/
 
@@ -491,6 +491,8 @@ struct pkt_attrib {
 	 */
 	u8 bf_pkt_type;
 #endif
+
+	u8 inject; /* == a5 if injected */
 
 #ifdef CONFIG_RTW_MGMT_QUEUE
 	u8 ps_dontq; /* 1: this frame can't be queued at PS state */

@@ -17,10 +17,17 @@
 #include <drv_types.h>
 #include <hal_data.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0))
+#define strlcpy strscpy
+#endif
+
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Realtek Wireless Lan Driver");
 MODULE_AUTHOR("Realtek Semiconductor Corp.");
 MODULE_VERSION(DRIVERVERSION);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+#endif
 
 /* module param defaults */
 int rtw_chip_version = 0x00;
@@ -799,7 +806,7 @@ MODULE_PARM_DESC(rtw_antenna_gain, "Antenna gain in mBi. 0x7FFF: unspecifed");
 
 #ifdef CONFIG_RTW_TX_NPATH_EN
 /*0:disable ,1: 2path*/
-int rtw_tx_npath_enable = 1;
+int rtw_tx_npath_enable = 0;
 module_param(rtw_tx_npath_enable, int, 0644);
 MODULE_PARM_DESC(rtw_tx_npath_enable, "0:Disable, 1:TX-2PATH");
 #endif
@@ -1877,6 +1884,12 @@ struct net_device *rtw_init_netdev(_adapter *old_padapter)
 
 	if (!pnetdev)
 		return NULL;
+		
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0))
+	pnetdev->min_mtu = WLAN_MIN_ETHFRM_LEN;
+	pnetdev->mtu = WLAN_DATA_MAXLEN;
+	pnetdev->max_mtu = WLAN_DATA_MAXLEN;
+#endif
 
 	padapter = rtw_netdev_priv(pnetdev);
 	padapter->pnetdev = pnetdev;

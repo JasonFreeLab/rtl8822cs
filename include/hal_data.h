@@ -37,6 +37,10 @@
 #include "../hal/hal_pwr_table.h"
 #include "../hal/hal_dfs.h"
 
+#ifdef CONFIG_BEAMFORMING_MONITOR
+#include "../hal/rtl8822c/rtl8822c_bf_monitor.h"
+#endif
+
 /*
  * <Roger_Notes> For RTL8723 WiFi/BT/GPS multi-function configuration. 2010.10.06.
  *   */
@@ -430,6 +434,8 @@ typedef struct hal_com_data {
 	u8	EEPROMVersion;
 	u8	EEPROMRegulatory;
 	u8	eeprom_thermal_meter;
+	u8 	eeprom_thermal_meter_multi[MAX_RF_PATH];
+	u8 	eeprom_thermal_offset_temperature;
 	u8	EEPROMBluetoothCoexist;
 	u8	EEPROMBluetoothType;
 	u8	EEPROMBluetoothAntNum;
@@ -819,6 +825,10 @@ typedef struct hal_com_data {
 	struct beamforming_info beamforming_info;
 #endif /* RTW_BEAMFORMING_VERSION_2 */
 #endif /* CONFIG_BEAMFORMING */
+
+#ifdef CONFIG_BEAMFORMING_MONITOR
+        struct csi_rpt_monitor csi_rpt_monitor;
+#endif
 
 	u8 not_xmitframe_fw_dl; /*not use xmitframe to download fw*/
 	u8 phydm_op_mode;

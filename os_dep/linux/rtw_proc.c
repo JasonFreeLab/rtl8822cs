@@ -3841,6 +3841,19 @@ static int proc_get_best_chan(struct seq_file *m, void *v)
 	return 0;
 }
 
+static int proc_get_acs_current_channel(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *adapter = (_adapter *)rtw_netdev_priv(dev);
+
+	if (IS_ACS_ENABLE(adapter))
+		rtw_acs_current_info_dump(m, adapter);
+	else
+		_RTW_PRINT_SEL(m,"ACS disabled\n");
+	return 0;
+}
+
+
 static ssize_t proc_set_acs(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 #ifdef CONFIG_RTW_ACS_DBG
@@ -5383,11 +5396,467 @@ static ssize_t proc_set_amsdu_mode(struct file *file, const char __user *buffer,
 
 }
 
+static int proc_get_edcca_threshold_jaguar3_override(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+
+	RTW_PRINT_SEL(m, "Usage: echo \"<en> <dBm_l2h>\" > edcca_threshold_jaguar3_override\n");
+	RTW_PRINT_SEL(m, "\ten: 0-disable, 1-enable\n");
+	RTW_PRINT_SEL(m, "\tdBm_l2h: Energy CCA level in dBm, range: [-100, 7]; it's -72dBm (0xB0-248) by default from my adaptor's register.\n");
+	RTW_PRINT_SEL(m, "e.g.  To set the threshold to l2h=-40dBm (then h2l=-48dBm), use \n");
+	RTW_PRINT_SEL(m, "\techo \"1 -40\" > edcca_threshold_jaguar3_override\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Disclaimer: There's no guarantee on performance. \n");
+	RTW_PRINT_SEL(m, "This operation may damage your hardware.\n");
+	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
+
+	return 0;
+}
+
+static ssize_t proc_set_edcca_threshold_jaguar3_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv *pregpriv = &padapter->registrypriv;
+	char tmp[32];
+	s32 edcca_thresh = -72;
+	u8 edcca_thresh_en = 0;
+
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 2) {
+		RTW_INFO("edcca_threshold_jaguar3_override Argument error. \n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%hhu %d", &edcca_thresh_en, &edcca_thresh);
+		if (num < 1)
+			return count;
+	}
+
+	if (edcca_thresh > 7 || edcca_thresh < -100) {
+		RTW_INFO("edcca_threshold_jaguar3_override dBm_l2h out of range: %d\n", edcca_thresh);
+		return count;
+	}
+
+	RTW_INFO("Write to edcca_threshold_jaguar3_override: EDCCA override %s, L2H threshold = %ddBm\n", (edcca_thresh_en==1)? "enabled": "disabled", edcca_thresh);
+
+	pregpriv->edcca_thresh_override_en = edcca_thresh_en;
+	pregpriv->edcca_thresh_l2h_override = (s8)edcca_thresh;
+
+	return count;
+}
+
+static int proc_get_thermal_state(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+        struct dm_struct *p_dm_odm = adapter_to_phydm(padapter);
+        HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
+
+        u8 rx_cnt = rf_type_to_rf_rx_cnt(pHalData->rf_type);
+        int thermal_value = 0;
+        int thermal_offset = 0;
+        int temperature_offset = 32;	// To-Do: measure the value for 8822C. see comment in 8812eu commit 5b7a66d for details
+        int temperature = 0; 
+        int rf_path = 0;
+        u32 thermal_reg_mask = 0;
+
+        if (IS_8822C_SERIES(GET_HAL_DATA(padapter)->version_id)
+                || IS_8723F_SERIES(GET_HAL_DATA(padapter)->version_id)
+                || IS_8822E_SERIES(GET_HAL_DATA(padapter)->version_id))
+                        thermal_reg_mask = 0x007e;      /*0x42: RF Reg[6:1], 35332(themal K  & bias k & power trim) & 35325(tssi )*/
+        else
+                        thermal_reg_mask = 0xfc00;      /*0x42: RF Reg[15:10]*/
+                        
+        temperature_offset = (pHalData->eeprom_thermal_offset_temperature==0)? 
+				temperature_offset: pHalData->eeprom_thermal_offset_temperature;
+
+        for(rf_path = 0; rf_path < rx_cnt; rf_path++)
+        {
+            // need to manually trigger the ADC conversion for latest data
+            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x1);
+            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x0);
+            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x1);
+
+            rtw_usleep_os(15);    // 15us in halrf_get_thermal_8822e()
+            
+            thermal_value = phy_query_rf_reg(padapter, rf_path, 0x42, thermal_reg_mask);
+            thermal_offset = pHalData->eeprom_thermal_meter_multi[rf_path];
+            temperature = (((thermal_value-thermal_offset) *5)/2) + temperature_offset;
+            RTW_PRINT_SEL(m, "rf_path: %d, thermal_value: %d, offset: %d, temperature: %d\n", rf_path, thermal_value, thermal_offset, temperature);
+        }
+
+        return 0;
+}
+
+static ssize_t proc_set_thermal_state(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv *pregpriv = &padapter->registrypriv;
+	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
+	char tmp[32];
+	u32 offset_temp;
+
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 1) {
+		RTW_INFO("Set thermal_state Argument error. \n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u", &offset_temp);
+		if (num < 1)
+			return count;
+	}
+
+	if (offset_temp > 70) {
+		RTW_INFO("Set thermal_state Argument range error. \n");
+		return -EFAULT;
+	}
+
+	RTW_INFO("Write to thermal_state offset tempC : %d\n", offset_temp);
+	pHalData->eeprom_thermal_offset_temperature = (u8)offset_temp;
+
+	return count;
+}
+
+static int proc_get_dis_cca(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
+	u32 bit_dis_cca;
+
+	if (!padapter)
+		return -EFAULT;
+
+	dm = adapter_to_phydm(padapter);
+
+	bit_dis_cca = odm_get_mac_reg(dm, R_0x520, BIT(15));
+
+	RTW_PRINT_SEL(m, "BIT_DIS_EDCCA = %d, CCA %s\n", bit_dis_cca, bit_dis_cca? "disabled": "enabled");
+
+	return 0;
+}
+
+static ssize_t proc_set_dis_cca(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
+	char tmp[32];
+	u32 en;
+	
+	dm = adapter_to_phydm(padapter);
+	
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 1) {
+		RTW_INFO("Set dis_cca Argument error.\n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u", &en);
+		if (num < 1)
+			return count;
+	}
+
+	if (en != 0 && en != 1) {
+		RTW_INFO("Set dis_cca Argument range error.\n");
+		return -EFAULT;
+	}
+
+	if (en == 1) {
+		// mac bit_dis_edcca 
+		odm_set_mac_reg(dm, R_0x520, BIT(15), 1);
+		// mac bit_edcca_msk_countdown
+		odm_set_mac_reg(dm, R_0x524, BIT(11), 0);
+		// bb cck cca
+		odm_set_bb_reg(dm, R_0x1a9c, BIT(20), 0x0);
+		odm_set_bb_reg(dm, R_0x1a14, 0x300, 0x3);
+		// bb ofdm cca 
+		odm_set_bb_reg(dm, R_0x1d58, 0xff8, 0x1ff);	
+	} else {
+		// mac bit_dis_edcca 
+		odm_set_mac_reg(dm, R_0x520, BIT(15), 0);
+		// mac bit_edcca_msk_countdown
+		odm_set_mac_reg(dm, R_0x524, BIT(11), 1);
+		// bb cck cca
+		odm_set_bb_reg(dm, R_0x1a9c, BIT(20), 0x1);
+		odm_set_bb_reg(dm, R_0x1a14, 0x300, 0x0);
+		// bb ofdm cca
+		odm_set_bb_reg(dm, R_0x1d58, 0xff8, 0x0);
+	}
+
+
+	RTW_INFO("Write to dis_cca: %d, %s cca\n", en, (en==1)? "disabled": "enabled");
+
+	return count;
+}
+
+static int proc_get_single_tone(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
+	u32 bit_dis_cca;
+
+	if (!padapter)
+		return -EFAULT;
+
+	dm = adapter_to_phydm(padapter);
+
+
+	RTW_PRINT_SEL(m, "single_tone: <en:0(dis)/1(en)> <rf_path:0(A)/1(B)/4(AB)>\n");
+
+	return 0;
+}
+
+static ssize_t proc_set_single_tone(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
+	char tmp[32];
+	u32 en, rf_path;
+	
+	dm = adapter_to_phydm(padapter);
+	
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 2) {
+		RTW_INFO("Set single_tone Argument error.\n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u %u", &en, &rf_path);
+		if (num < 1)
+			return count;
+	}
+
+	if (rf_path != RF_PATH_A && rf_path != RF_PATH_B && rf_path != RF_PATH_AB) {
+		RTW_INFO("Set single_tone rf_path Argument range error.\n");
+		return -EFAULT;
+	}
+
+	if (en != 0 && en != 1) {
+		RTW_INFO("Set single_tone en Argument range error.\n");
+		return -EFAULT;
+	}
+
+	if (en == 1) {
+		phydm_mp_set_single_tone(dm, true, rf_path);
+	} else {
+		phydm_mp_set_single_tone(dm, false, rf_path);
+	}
+
+	RTW_INFO("Write to single_tone: en %d, path %d\n", en, rf_path);
+
+	return count;
+}
+
+#ifdef CONFIG_BEAMFORMING_MONITOR
+static int proc_get_bf_monitor_conf(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	
+	if (!padapter)
+		return -EFAULT;
+        bf_monitor_print_conf(padapter, m);
+	return 0;
+}
+static ssize_t proc_set_bf_monitor_conf(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
+	char tmp[64];
+	int num;
+	int action; // 0-reset, 1-init
+	u8 bfer_macaddr[6]; 
+        u16 bfee_p_aid;     // Partial AID, 12-bit
+        u8 bfer_g_id;       // Group ID, 0 or 63
+	
+	dm = adapter_to_phydm(padapter);
+	if (!padapter)
+		return -EFAULT;
+	if (count > sizeof(tmp)) 
+		goto show_usage;
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		num = sscanf(tmp, "%d", &action);
+		if (num < 1)
+			goto show_usage;
+	}
+	
+        if (action == 0) {
+            bf_monitor_reset(padapter);
+            RTW_INFO("%s: Write to bf_monitor_conf: bf_monitor_reset\n", __FUNCTION__);
+        } else if (action == 1) {
+            num = sscanf(tmp, "%d %2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %hhu %hu", &action, 
+                &bfer_macaddr[0], &bfer_macaddr[1], &bfer_macaddr[2], &bfer_macaddr[3], &bfer_macaddr[4], &bfer_macaddr[5],
+                &bfer_g_id, &bfee_p_aid);
+            RTW_INFO("%s: Write to bf_monitor_conf: bf_monitor_init, \n", __FUNCTION__);
+	    bf_monitor_init(padapter, bfer_macaddr, bfer_g_id, bfee_p_aid);
+        } else {
+            RTW_INFO("%s: Write to bf_monitor_conf: arg error \n", __FUNCTION__);
+            goto show_usage;
+        }
+	return count;
+show_usage:
+	// Print usage to dmesg
+	RTW_INFO("bf_monitor_conf Usage: \n");
+	RTW_INFO("\t< action (0:rst/1:set) > < remote bfer mac > < remote bfer g_id > < remote bfee p_aid >\n");
+	RTW_INFO("example: \n");
+	RTW_INFO("\techo \"1 00:11:22:33:44:55 0 0\" > bf_monitor_conf \n");
+	return -EFAULT;
+}
+static int proc_get_bf_monitor_trig(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	
+	if (!padapter)
+		return -EFAULT;
+        bf_monitor_print_cbr(padapter, m);
+        
+	return 0;
+}
+static ssize_t proc_set_bf_monitor_trig(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
+	char tmp[128];
+	
+	u8 bfer_macaddr[6]; 
+        u8 bfee_macaddr[6]; 
+        u16 p_aid;          // Partial AID, 12-bit
+        u8 g_id;            // Group ID, 0 or 63
+        u8 seq;             // 0~63, 6-bit
+        enum channel_width bw;
+        u8 bw_int;
+	
+	dm = adapter_to_phydm(padapter);
+	if (!padapter)
+		return -EFAULT;
+	if (count > sizeof(tmp)) 
+		goto show_usage;
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %hu %hhu %hhu %hhu", 
+		    &bfer_macaddr[0], &bfer_macaddr[1], &bfer_macaddr[2], &bfer_macaddr[3], &bfer_macaddr[4], &bfer_macaddr[5],
+		    &bfee_macaddr[0], &bfee_macaddr[1], &bfee_macaddr[2], &bfee_macaddr[3], &bfee_macaddr[4], &bfee_macaddr[5],
+                    &p_aid, &g_id, &seq, &bw_int);
+		if (num < 1)
+			goto show_usage;
+	}
+	
+	if (bw_int == 5 || bw_int == 10 || bw_int == 20) 
+	    bw = CHANNEL_WIDTH_20;
+	else if (bw_int == 40) 
+	    bw = CHANNEL_WIDTH_40; 
+	else if (bw_int == 80) 
+	    bw = CHANNEL_WIDTH_80;
+	else {
+	    RTW_INFO("Write to bf_monitor_trig: invalid BW\n");
+	    goto show_usage;
+	}
+	
+	seq &= 0x3f;
+	p_aid &= 0x0fff;
+	g_id = (g_id==0)? 0: 63;
+	
+	bf_monitor_send(padapter, bfer_macaddr, bfee_macaddr, p_aid, g_id, seq, bw);
+	
+	return count;
+	
+show_usage:
+        // Print usage to dmesg
+	RTW_INFO("bf_monitor_trig, send VHT NDPA + NDP packet \n");
+	RTW_INFO("Usage: \n");
+	RTW_INFO("\t<rx_addr> <tx_addr> <p_aid(12bit)> <g_id(0/63)> <sounding_token(0~63)> <bw(10/20/40/80)>\n");
+	RTW_INFO("example: \n");
+	RTW_INFO("\techo \"00:11:22:33:44:55 66:77:88:99:aa:bb 0 0 0 20\" > bf_monitor_trig \n");
+	
+        return -EFAULT;
+}
+static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	char tmp[128];
+	
+        u8 en;
+	
+	if (!padapter)
+		return -EFAULT;
+	if (count > sizeof(tmp)) 
+		return -EFAULT;
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%hhu", &en);
+		if (num < 1)
+			return -EFAULT;
+	}
+	
+	bf_monitor_enable_txbf(padapter, en>0? _TRUE: _FALSE);
+        RTW_INFO("bf_monitor_enable, %hhu \n", en);
+	return count;
+}
+#endif 
+
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
 */
 const struct rtw_proc_hdl adapter_proc_hdls[] = {
+	RTW_PROC_HDL_SSEQ("edcca_threshold_jaguar3_override", proc_get_edcca_threshold_jaguar3_override, proc_set_edcca_threshold_jaguar3_override),
+	RTW_PROC_HDL_SSEQ("thermal_state", proc_get_thermal_state, proc_set_thermal_state),
+	RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
+	RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
+#ifdef CONFIG_BEAMFORMING_MONITOR
+        RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
+        RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
+        RTW_PROC_HDL_SSEQ("bf_monitor_en",   NULL,                     proc_set_bf_monitor_en),
+#endif
 #if RTW_SEQ_FILE_TEST
 	RTW_PROC_HDL_SEQ("seq_file_test", &seq_file_test, NULL),
 #endif
@@ -5698,6 +6167,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 
 #ifdef CONFIG_RTW_ACS
 	RTW_PROC_HDL_SSEQ("acs", proc_get_best_chan, proc_set_acs),
+	RTW_PROC_HDL_SSEQ("acs_current", proc_get_acs_current_channel, NULL),
 	RTW_PROC_HDL_SSEQ("chan_info", proc_get_chan_info, NULL),
 #endif
 

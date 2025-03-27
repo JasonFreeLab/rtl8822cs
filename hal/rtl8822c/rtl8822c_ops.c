@@ -507,6 +507,8 @@ static void Hal_EfuseParseThermalMeter(PADAPTER adapter, u8 *map, u8 mapvalid)
 		u8 eeprom_thermal_meter_a = map[EEPROM_THERMAL_METER_A_8822C];
 		u8 eeprom_thermal_meter_b = map[EEPROM_THERMAL_METER_B_8822C];		
 		hal->eeprom_thermal_meter = (eeprom_thermal_meter_a + eeprom_thermal_meter_b)/2;
+		hal->eeprom_thermal_meter_multi[0] = eeprom_thermal_meter_a; 
+		hal->eeprom_thermal_meter_multi[1] = eeprom_thermal_meter_b; 
 	} else {
 		hal->eeprom_thermal_meter = EEPROM_Default_ThermalMeter;
 		hal->odmpriv.rf_calibrate_info.is_apk_thermal_meter_ignore = _TRUE;
@@ -3457,9 +3459,8 @@ void rtl8822c_fill_txdesc_bmc_tx_rate(struct pkt_attrib *pattrib, u8 *ptxdesc)
  */
 void rtl8822c_fill_txdesc_bf(struct xmit_frame *frame, u8 *desc)
 {
-#ifndef CONFIG_BEAMFORMING
-	return;
-#else /* CONFIG_BEAMFORMING */
+#if defined(CONFIG_BEAMFORMING) || defined(CONFIG_BEAMFORMING_MONITOR) 
+       
 	struct pkt_attrib *attrib;
 	struct _ADAPTER *padapter = frame->padapter;
 	struct hal_com_data *pHalData = GET_HAL_DATA(padapter);
@@ -3470,13 +3471,15 @@ void rtl8822c_fill_txdesc_bf(struct xmit_frame *frame, u8 *desc)
 
 	SET_TX_DESC_G_ID_8822C(desc, attrib->txbf_g_id);
 	SET_TX_DESC_P_AID_8822C(desc, attrib->txbf_p_aid);
-
+        //RTW_INFO("+%s p_aid=%u g_id=%u\n",__FUNCTION__, attrib->txbf_p_aid, attrib->txbf_g_id); 
 	SET_TX_DESC_MU_DATARATE_8822C(desc, init_rate);
 	/*SET_TX_DESC_MU_RC_8822C(desc, 0);*/
 
 	/* Force to disable STBC when txbf is enabled */
 	if (attrib->txbf_p_aid && attrib->stbc)
 		SET_TX_DESC_DATA_STBC_8822C(desc, 0);
+#else
+        return;
 #endif /* CONFIG_BEAMFORMING */
 }
 
@@ -3490,9 +3493,8 @@ void rtl8822c_fill_txdesc_bf(struct xmit_frame *frame, u8 *desc)
  */
 void rtl8822c_fill_txdesc_mgnt_bf(struct xmit_frame *frame, u8 *desc)
 {
-#ifndef CONFIG_BEAMFORMING
-	return;
-#else /* CONFIG_BEAMFORMING */
+#if defined(CONFIG_BEAMFORMING) || defined(CONFIG_BEAMFORMING_MONITOR)
+
 	PADAPTER adapter;
 	struct pkt_attrib *attrib;
 	u8 ndpa = 0;
@@ -3543,6 +3545,8 @@ void rtl8822c_fill_txdesc_mgnt_bf(struct xmit_frame *frame, u8 *desc)
 	 */
 	/*SET_TX_DESC_P_AID_8822C(desc, pattrib->txbf_p_aid);*/
 	SET_TX_DESC_SND_PKT_SEL_8822C(desc, attrib->bf_pkt_type);
+#else
+        return;
 #endif /* CONFIG_BEAMFORMING */
 }
 

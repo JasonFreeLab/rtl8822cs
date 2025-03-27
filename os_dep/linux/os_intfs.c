@@ -1974,7 +1974,7 @@ void rtw_os_ndev_free(_adapter *adapter)
 
 /* For ethtool +++ */
 #ifdef CONFIG_IOCTL_CFG80211
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 8))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 8)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0))
 static void rtw_ethtool_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct wireless_dev *wdev = NULL;
@@ -2104,11 +2104,11 @@ int rtw_os_ndev_register(_adapter *adapter, const char *name)
 		goto exit;
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 8))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 8)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0))
 	netdev_set_default_ethtool_ops(ndev, &rtw_ethtool_ops);
 #endif /* LINUX_VERSION_CODE >= 3.7.8 */
 #endif
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) && defined(CONFIG_PCI_HCI)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)) && defined(CONFIG_PCI_HCI)
 	ndev->gro_flush_timeout = 100000;
 #endif
 	/* alloc netdev name */

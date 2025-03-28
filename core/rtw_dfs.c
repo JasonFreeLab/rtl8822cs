@@ -1207,8 +1207,10 @@ apply:
 				if (0) {
 					/* TODO: do CSA if supported */
 				} else {
+#ifdef CONFIG_AP_MODE
 					rtw_change_bss_bchbw_cmd(m_iface, RTW_CMDF_DIRECTLY
 						, ifbmp_m, ifbmp_s, REQ_BAND_NONE, REQ_CH_NONE, REQ_BW_ORI, REQ_OFFSET_NONE);
+#endif /* CONFIG_AP_MODE */
 				}
 			}
 		}

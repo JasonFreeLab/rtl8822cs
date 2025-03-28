@@ -82,22 +82,22 @@ CONFIG_PCI_HCI = n
 CONFIG_SDIO_HCI = n
 CONFIG_GSPI_HCI = n
 ########################## Features ###########################
-CONFIG_AP_MODE = y
+CONFIG_AP_MODE = n
 CONFIG_P2P = n
 CONFIG_MP_INCLUDED = y
-CONFIG_POWER_SAVING = y
+CONFIG_POWER_SAVING = n
 CONFIG_IPS_MODE = 0
 CONFIG_LPS_MODE = 0
 CONFIG_USB_AUTOSUSPEND = n
 CONFIG_HW_PWRP_DETECTION = n
-CONFIG_BT_COEXIST = y
+CONFIG_BT_COEXIST = n
 CONFIG_WAPI_SUPPORT = n
 CONFIG_EFUSE_CONFIG_FILE = y
 CONFIG_EXT_CLK = n
 CONFIG_TRAFFIC_PROTECT = n
 CONFIG_LOAD_PHY_PARA_FROM_FILE = y
 CONFIG_TXPWR_BY_RATE = y
-CONFIG_TXPWR_BY_RATE_EN = y
+CONFIG_TXPWR_BY_RATE_EN = n
 CONFIG_TXPWR_LIMIT = y
 CONFIG_TXPWR_LIMIT_EN = n
 CONFIG_RTW_REGDB = rtk
@@ -110,7 +110,7 @@ CONFIG_RTW_CHPLAN = 0xFFFF
 CONFIG_RTW_CHPLAN_6G = 0xFFFF
 
 ########################## 802.11d (country IE slave) ##########################
-CONFIG_80211D = y
+CONFIG_80211D = n
 # 0: disable, 1: enable, 2: enable when INIT/USER set world wide mode
 CONFIG_RTW_COUNTRY_IE_SLAVE_EN_MODE = 0
 # BIT0: take intersection when having multiple received IEs, otherwise choose effected one from received IEs
@@ -142,7 +142,7 @@ CONFIG_ICMP_VOQ = n
 CONFIG_IP_R_MONITOR = n #arp VOQ and high rate
 # user priority mapping rule : tos, dscp
 CONFIG_RTW_UP_MAPPING_RULE = tos
-CONFIG_RTW_MBO = n
+CONFIG_RTW_MBO = y
 CONFIG_WAKE_ON_BT = n
 CONFIG_HIGH_PRIORITY_CMD_THREAD = n
 CONFIG_RTW_DISABLE_HW_PDN = n
@@ -157,7 +157,7 @@ EXTRA_CFLAGS += -DCONFIG_RTW_ANDROID=$(CONFIG_RTW_ANDROID)
 endif
 
 ########################## Debug ###########################
-CONFIG_RTW_DEBUG = y
+CONFIG_RTW_DEBUG = n
 # default log level is _DRV_INFO_ = 4,
 # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
 CONFIG_RTW_LOG_LEVEL = 4

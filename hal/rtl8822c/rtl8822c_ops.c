@@ -3889,6 +3889,7 @@ static void fill_default_txdesc(struct xmit_frame *pxmitframe, u8 *pbuf)
 	 * (3) Use HW Qos SEQ to control the seq num of Ext port non-Qos packets.
 	 * 2010.06.23. Added by tynli.
 	 */
+	// Not injected
 	if (pattrib->inject != 0xa5) {
 		if (!pattrib->qos_en) {
 			SET_TX_DESC_DISQSELSEQ_8822C(pbuf, 1);

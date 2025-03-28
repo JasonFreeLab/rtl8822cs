@@ -8,12 +8,12 @@ EXTRA_CFLAGS += -O1
 #EXTRA_CFLAGS += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
 
 EXTRA_CFLAGS += -Wno-unused-variable
-#EXTRA_CFLAGS += -Wno-unused-value
-#EXTRA_CFLAGS += -Wno-unused-label
-#EXTRA_CFLAGS += -Wno-unused-parameter
-#EXTRA_CFLAGS += -Wno-unused-function
-#EXTRA_CFLAGS += -Wno-unused
-#EXTRA_CFLAGS += -Wno-uninitialized
+EXTRA_CFLAGS += -Wno-unused-value
+EXTRA_CFLAGS += -Wno-unused-label
+EXTRA_CFLAGS += -Wno-unused-parameter
+EXTRA_CFLAGS += -Wno-unused-function
+EXTRA_CFLAGS += -Wno-unused
+EXTRA_CFLAGS += -Wno-uninitialized
 
 # Let the OS decide the regd instead of phy "self-managed"
 EXTRA_CFLAGS += -DCONFIG_REGD_SRC_FROM_OS
@@ -268,6 +268,7 @@ CONFIG_PLATFORM_RTL8197D = n
 CONFIG_PLATFORM_AML_S905 = n
 CONFIG_PLATFORM_ZTE_ZX296716 = n
 CONFIG_PLATFORM_MTK9612 = n
+CONFIG_PLATFORM_ARM_RK1106 = n
 ########### CUSTOMER ################################
 CONFIG_CUSTOMER_HUAWEI_GENERAL = n
 
@@ -1876,6 +1877,23 @@ KSRC := /usr/src/release_fae_version/kernel25_A7_281x
 MODULE_NAME := wlan
 endif
 
+ifeq ($(CONFIG_PLATFORM_ARM_RK3188), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_ANDROID -DCONFIG_PLATFORM_ROCKCHIPS
+# default setting for Android 4.1, 4.2, 4.3, 4.4
+EXTRA_CFLAGS += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
+EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE
+# default setting for Power control
+EXTRA_CFLAGS += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+ifeq ($(CONFIG_SDIO_HCI), y)
+EXTRA_CFLAGS += -DRTW_SUPPORT_PLATFORM_SHUTDOWN
+endif
+# default setting for Special function
+ARCH := arm
+CROSS_COMPILE := /home/android_sdk/Rockchip/Rk3188/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
+KSRC := /home/android_sdk/Rockchip/Rk3188/kernel
+MODULE_NAME := wlan
+endif
+
 ifeq ($(CONFIG_PLATFORM_ARM_RK3066), y)
 EXTRA_CFLAGS += -DCONFIG_PLATFORM_ARM_RK3066
 EXTRA_CFLAGS += -DRTW_ENABLE_WIFI_CONTROL_FUNC
@@ -2482,6 +2500,24 @@ ifeq ($(CONFIG_USB_HCI), y)
 EXTRA_CFLAGS += -DCONFIG_USE_USB_BUFFER_ALLOC_TX -DCONFIG_FIX_NR_BULKIN_BUFFER
 endif
 endif
+
+ifeq ($(CONFIG_PLATFORM_ARM_RK1106), y)
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DANDROID_PLATFORM -DCONFIG_PLATFORM_ROCKCHIP #-DCONFIG_MINIMAL_MEMORY_USAGE
+
+# default setting for Android 4.1, 4.2, 4.3, 4.4
+EXTRA_CFLAGS += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
+EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE
+
+# default setting for Power control
+# EXTRA_CFLAGS += -DRTW_ENABLE_WIFI_CONTROL_FUNC
+
+# default setting for Special function
+ARCH ?= arm
+CROSS_COMPILE ?= arm-rockchip830-linux-uclibcgnueabihf-
+KSRC ?= $(LUCKFOX_SDK_PATH)/sysdrv/source/kernel
+MODULE_NAME := 8812eu
+endif
+
 ########### CUSTOMER ################################
 ifeq ($(CONFIG_CUSTOMER_HUAWEI_GENERAL), y)
 CONFIG_CUSTOMER_HUAWEI = y

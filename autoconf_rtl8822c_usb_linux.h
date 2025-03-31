@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2015 - 2017 Realtek Corporation.
+ * Copyright(c) 2015 - 2022 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -99,7 +99,6 @@
 	#endif
 
 	#ifdef CONFIG_LPS_LCLK
-		#define CONFIG_LPS_PG 1
 		#ifdef CONFIG_POWER_SAVING
 			/* #define CONFIG_XMIT_THREAD_MODE */
 		#endif /* CONFIG_POWER_SAVING */
@@ -108,6 +107,7 @@
 			#define CONFIG_DETECT_CPWM_BY_POLLING
 		#endif /* !CONFIG_SUPPORT_USB_INT */
 		/* #define DBG_CHECK_FW_PS_STATE */
+		#define CONFIG_LPS_PG
 	#endif /* CONFIG_LPS_LCLK */
 
 	#ifdef CONFIG_LPS
@@ -175,7 +175,7 @@
 
 #define CONFIG_SKB_COPY	1 /* amsdu */
 
-//#define CONFIG_RTW_LED
+/* #define CONFIG_RTW_LED */
 #ifdef CONFIG_RTW_LED
 	#define CONFIG_RTW_SW_LED
 	#ifdef CONFIG_RTW_SW_LED
@@ -207,8 +207,6 @@
 	#define CONFIG_USB_TX_AGGREGATION	1
 	#define CONFIG_USB_RX_AGGREGATION	1
 #endif
-
-#define CONFIG_USB_CONFIG_OFFLOAD_8822C
 
 /* #define CONFIG_REDUCE_USB_TX_INT	1 */ /* Trade-off: Improve performance, but may cause TX URBs blocked by USB Host/Bus driver on few platforms. */
 /* #define CONFIG_EASY_REPLACEMENT	1 */
@@ -306,6 +304,8 @@
 #define DBG	1
 
 #define DBG_CONFIG_ERROR_DETECT
+#define DBG_CONFIG_ERROR_RESET
+#define RTW_DETECT_HANG
 
 /*
 #define DBG_CONFIG_ERROR_DETECT_INT

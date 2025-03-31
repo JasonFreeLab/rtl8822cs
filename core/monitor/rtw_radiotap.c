@@ -173,7 +173,7 @@ static inline void _rtw_radiotap_fill_flags(struct rx_pkt_attrib *a, u8 *flags)
 
 sint rtw_fill_radiotap_hdr(_adapter *padapter, struct rx_pkt_attrib *a, u8 *buf)
 {
-#define RTAP_HDR_MAX 256
+#define RTAP_HDR_MAX 128
 
 	sint ret = _SUCCESS;
 	struct moinfo *moif = (struct moinfo *)&a->moif;
@@ -578,10 +578,10 @@ sint rtw_fill_radiotap_hdr(_adapter *padapter, struct rx_pkt_attrib *a, u8 *buf)
 			hdr_buf[rt_len] = a->phy_info.rx_pwr[i];
 			rt_len += 1;
 			
-	                /*  IEEE80211_RADIOTAP_DBM_ANTNOISE */
-                        hdr_buf[rt_len] = a->phy_info.rx_pwr[i] - a->phy_info.rx_snr[i];
-                        rt_len += 1;
-                        
+			 /*  IEEE80211_RADIOTAP_DBM_ANTNOISE */
+             hdr_buf[rt_len] = a->phy_info.rx_pwr[i] - a->phy_info.rx_snr[i];
+             rt_len += 1;
+
 			/* Signal Quality */
 			if (!IS_ALIGNED(rt_len, 2))
 				rt_len++;

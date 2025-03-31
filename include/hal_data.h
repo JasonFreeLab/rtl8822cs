@@ -40,7 +40,6 @@
 #ifdef CONFIG_BEAMFORMING_MONITOR
 #include "../hal/rtl8822c/rtl8822c_bf_monitor.h"
 #endif
-
 /*
  * <Roger_Notes> For RTL8723 WiFi/BT/GPS multi-function configuration. 2010.10.06.
  *   */

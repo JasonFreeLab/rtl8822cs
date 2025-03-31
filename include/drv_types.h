@@ -462,7 +462,7 @@ struct registry_priv {
 	// EDCCA threshold override
 	u8 edcca_thresh_override_en; 
 	s8 edcca_thresh_l2h_override; 
-	
+
 	u8 boffefusemask;
 	BOOLEAN bFileMaskEfuse;
 	BOOLEAN bBTFileMaskEfuse;

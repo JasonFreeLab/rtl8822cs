@@ -6822,7 +6822,7 @@ struct xmit_frame *_alloc_mgtxmitframe(struct xmit_priv *pxmitpriv, bool once)
 
 	pxmitbuf = rtw_alloc_xmitbuf_ext(pxmitpriv);
 	if (pxmitbuf == NULL) {
-		RTW_INFO(FUNC_ADPT_FMT" alloc xmitbuf fail\n", FUNC_ADPT_ARG(pxmitpriv->adapter));
+		//RTW_INFO(FUNC_ADPT_FMT" alloc xmitbuf fail\n", FUNC_ADPT_ARG(pxmitpriv->adapter));
 		rtw_free_xmitframe(pxmitpriv, pmgntframe);
 		pmgntframe = NULL;
 		goto exit;
@@ -14679,7 +14679,7 @@ operation_by_state:
 
 		val8 = 0; /* survey done */
 		rtw_hal_set_hwreg(padapter, HW_VAR_MLME_SITESURVEY, (u8 *)(&val8));
-
+		
                 /* Dirty patch solving not receiving wfb-ng packets after doing scan
                    Don't know the reason, but the call above breaks the connection,
                    so just set monitor mode again here
@@ -14688,7 +14688,7 @@ operation_by_state:
                         val8 = _HW_STATE_MONITOR_;
                         rtw_hal_set_hwreg(padapter, HW_VAR_SET_OPMODE, &val8);
                 }
-
+                
 		/* turn on phy-dynamic functions */
 		rtw_phydm_ability_restore(padapter);
 
@@ -15804,9 +15804,9 @@ u8 rtw_set_chbw_hdl(_adapter *padapter, u8 *pbuf)
 	u8 ifbmp_s = rtw_mi_get_ld_sta_ifbmp(padapter);
 	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
 	u8 u_ch, u_bw, u_offset;
+	
+	mlme = &padapter->mlmepriv;
 
-        mlme = &padapter->mlmepriv;
-        
 	if (!pbuf)
 		return H2C_PARAMETERS_ERROR;
 

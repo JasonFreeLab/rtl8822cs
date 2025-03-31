@@ -3460,7 +3460,6 @@ void rtl8822c_fill_txdesc_bmc_tx_rate(struct pkt_attrib *pattrib, u8 *ptxdesc)
 void rtl8822c_fill_txdesc_bf(struct xmit_frame *frame, u8 *desc)
 {
 #if defined(CONFIG_BEAMFORMING) || defined(CONFIG_BEAMFORMING_MONITOR) 
-       
 	struct pkt_attrib *attrib;
 	struct _ADAPTER *padapter = frame->padapter;
 	struct hal_com_data *pHalData = GET_HAL_DATA(padapter);
@@ -3471,7 +3470,7 @@ void rtl8822c_fill_txdesc_bf(struct xmit_frame *frame, u8 *desc)
 
 	SET_TX_DESC_G_ID_8822C(desc, attrib->txbf_g_id);
 	SET_TX_DESC_P_AID_8822C(desc, attrib->txbf_p_aid);
-        //RTW_INFO("+%s p_aid=%u g_id=%u\n",__FUNCTION__, attrib->txbf_p_aid, attrib->txbf_g_id); 
+
 	SET_TX_DESC_MU_DATARATE_8822C(desc, init_rate);
 	/*SET_TX_DESC_MU_RC_8822C(desc, 0);*/
 
@@ -3494,7 +3493,6 @@ void rtl8822c_fill_txdesc_bf(struct xmit_frame *frame, u8 *desc)
 void rtl8822c_fill_txdesc_mgnt_bf(struct xmit_frame *frame, u8 *desc)
 {
 #if defined(CONFIG_BEAMFORMING) || defined(CONFIG_BEAMFORMING_MONITOR)
-
 	PADAPTER adapter;
 	struct pkt_attrib *attrib;
 	u8 ndpa = 0;
@@ -3642,17 +3640,21 @@ static void fill_default_txdesc(struct xmit_frame *pxmitframe, u8 *pbuf)
 
 	desc_size = rtl8822c_get_tx_desc_size(adapter);
 	_rtw_memset(pbuf, 0, desc_size);
-
-	/* injected frame */
+	
 	if (pattrib->inject == 0xa5) {
-		/* Prevent sequence number from being overwritten */
-		SET_TX_DESC_EN_HWSEQ_8822C(pbuf, 0); /* Hw do not set sequence number */
-		SET_TX_DESC_SW_SEQ_8822C(pbuf, pattrib->seqnum); /* Copy inject sequence number to TxDesc */
+		SET_TX_DESC_LS_8822C(pbuf, 1);
+		SET_TX_DESC_MACID_8822C(pbuf, pattrib->mac_id);
+		SET_TX_DESC_RATE_ID_8822C(pbuf, pattrib->raid);
+		SET_TX_DESC_QSEL_8822C(pbuf, pattrib->qsel);
+		SET_TX_DESC_SW_SEQ_8822C(pbuf, pattrib->seqnum);
+
+		SET_TX_DESC_EN_HWSEQ_8822C(pbuf, 0); 
+		SET_TX_DESC_SW_SEQ_8822C(pbuf, pattrib->seqnum); 
 
 		SET_TX_DESC_RTY_LMT_EN_8822C(pbuf, 1);
 
 		if (pattrib->retry_ctrl == _TRUE) {
-			SET_TX_DESC_RTS_DATA_RTY_LMT_8822C(pbuf, 6); // todo: idk if it's the correct api
+			SET_TX_DESC_RTS_DATA_RTY_LMT_8822C(pbuf, 6); 
 		} else {
 			SET_TX_DESC_RTS_DATA_RTY_LMT_8822C(pbuf, 0);
 		}
@@ -3662,8 +3664,8 @@ static void fill_default_txdesc(struct xmit_frame *pxmitframe, u8 *pbuf)
 			SET_TX_DESC_DATA_SHORT_8822C(pbuf, 0);
 		}
 
-		SET_TX_DESC_DISDATAFB_8822C(pbuf, 1);   
-		SET_TX_DESC_DISRTSFB_8822C(pbuf, 1);	   
+		SET_TX_DESC_DISDATAFB_8822C(pbuf, 1);
+		SET_TX_DESC_DISRTSFB_8822C(pbuf, 1);
 
 		SET_TX_DESC_USE_RATE_8822C(pbuf, 1);
 		SET_TX_DESC_DATARATE_8822C(pbuf, MRateToHwRate(pattrib->rate));
@@ -3672,9 +3674,10 @@ static void fill_default_txdesc(struct xmit_frame *pxmitframe, u8 *pbuf)
 			SET_TX_DESC_DATA_LDPC_8822C(pbuf, 1);
 		}
 		SET_TX_DESC_DATA_STBC_8822C(pbuf, pattrib->stbc & 3);
-		SET_TX_DESC_DATA_BW_8822C(pbuf, pattrib->bwmode); // 0 - 20 MHz, 1 - 40 MHz, 2 - 80 MHz
+		SET_TX_DESC_DATA_BW_8822C(pbuf, pattrib->bwmode);
 
-	} else if (pxmitframe->frame_tag == DATA_FRAMETAG) {
+	}
+	else if (pxmitframe->frame_tag == DATA_FRAMETAG) {
 		u8 drv_userate = 0;
 
 		SET_TX_DESC_MACID_8822C(pbuf, pattrib->mac_id);
@@ -3889,7 +3892,6 @@ static void fill_default_txdesc(struct xmit_frame *pxmitframe, u8 *pbuf)
 	 * (3) Use HW Qos SEQ to control the seq num of Ext port non-Qos packets.
 	 * 2010.06.23. Added by tynli.
 	 */
-	// Not injected
 	if (pattrib->inject != 0xa5) {
 		if (!pattrib->qos_en) {
 			SET_TX_DESC_DISQSELSEQ_8822C(pbuf, 1);
@@ -3899,7 +3901,6 @@ static void fill_default_txdesc(struct xmit_frame *pxmitframe, u8 *pbuf)
 			SET_TX_DESC_SW_SEQ_8822C(pbuf, pattrib->seqnum);
 		}
 	}
-
 	SET_TX_DESC_PORT_ID_8822C(pbuf, hw_port);
 	SET_TX_DESC_MULTIPLE_PORT_8822C(pbuf, hw_port);
 

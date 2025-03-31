@@ -4844,8 +4844,9 @@ int rtw_ieee80211_radiotap_iterator_init(
 	struct ieee80211_radiotap_iterator *iterator,
 	struct ieee80211_radiotap_header *radiotap_header,
 	int max_length, const struct ieee80211_radiotap_vendor_namespaces *vns);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24))
-static struct xmit_frame* monitor_alloc_mgtxmitframe(struct xmit_priv *pxmitpriv) {
+	
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24))
+ static struct xmit_frame* monitor_alloc_mgtxmitframe(struct xmit_priv *pxmitpriv) {
 	int tries;
 	int delay = 300;
 	struct xmit_frame *pmgntframe = NULL;
@@ -4861,6 +4862,7 @@ static struct xmit_frame* monitor_alloc_mgtxmitframe(struct xmit_priv *pxmitpriv
 	}
 	return pmgntframe;
 }
+
 s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 {
 	int ret = 0;

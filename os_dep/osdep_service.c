@@ -3058,7 +3058,6 @@ struct net_device *rtw_alloc_etherdev_with_old_priv(int sizeof_priv, void *old_p
 	pnetdev->mtu = WLAN_MAX_ETHFRM_LEN;
 	pnetdev->max_mtu = WLAN_DATA_MAXLEN;
 #endif
-
 	pnpi = netdev_priv(pnetdev);
 	pnpi->priv = old_priv;
 	pnpi->sizeof_priv = sizeof_priv;

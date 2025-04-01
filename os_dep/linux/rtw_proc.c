@@ -5784,6 +5784,9 @@ static int proc_get_thermal_state(struct seq_file *m, void *v)
             RTW_PRINT_SEL(m, "rf_path: %d, thermal_value: %d, offset: %d, temperature: %d\n", rf_path, thermal_value, thermal_offset, temperature);
         }
 
+        return 0;
+}
+
 static int proc_get_single_tone(struct seq_file *m, void *v)
 {
 	struct net_device *dev = m->private;

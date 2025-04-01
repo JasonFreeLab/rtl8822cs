@@ -1233,14 +1233,12 @@ static ssize_t proc_set_rx_info_msg(struct file *file, const char __user *buffer
 
 	struct net_device *dev = data;
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct recv_priv *precvpriv;
+	struct recv_priv *precvpriv = &(padapter->recvpriv);
 	char tmp[32] = {0};
 	int phy_info_flag = 0;
 
 	if (!padapter)
 		return -EFAULT;
-
-	precvpriv = &(padapter->recvpriv);
 
 	if (count < 1) {
 		RTW_INFO("argument size is less than 1\n");
@@ -1597,6 +1595,318 @@ static ssize_t proc_set_chan_plan(struct file *file, const char __user *buffer, 
 	return count;
 }
 
+static int proc_get_monitor_chan_override(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+
+	RTW_PRINT_SEL(m, "Unlock Center Frequency\n");
+	RTW_PRINT_SEL(m, "Github: JasonFreeLab/rtl88x2c\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Usage: echo \"<chan> <bw>\" > monitor_chan_override\n");
+	RTW_PRINT_SEL(m, "chan:	16~253, freq=channel*5+5000\n");
+	RTW_PRINT_SEL(m, "bw:	10/20/40/80, MHz. Not determing the bandwidth, but should be the same as 'iw'\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "e.g. \n");
+	RTW_PRINT_SEL(m, "1. To transmit in 6005MHz with 10MHz BW, you should: \n");
+	RTW_PRINT_SEL(m, "\t - use 'iw' to set the bandwidth to 10MHz in any channel \n");
+	RTW_PRINT_SEL(m, "\t - use '-B 20' in 'wfb-ng' or any other tools\n");
+	RTW_PRINT_SEL(m, "\t - echo \"201 10\" > monitor_chan_override\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "2. To transmit in 5080MHz with 20MHz BW: \n");
+	RTW_PRINT_SEL(m, "\t - use 'iw' to set the bandwidth to 20MHz in any channel \n");
+	RTW_PRINT_SEL(m, "\t - use '-B 20' in 'wfb-ng' or any other tools\n");
+	RTW_PRINT_SEL(m, "\t - echo \"16 20\" > monitor_chan_override\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "3. To transmit in 5255MHz with 40MHz BW: \n");
+	RTW_PRINT_SEL(m, "\t - use 'iw' to set the bandwidth to HT40 in any channel \n");
+	RTW_PRINT_SEL(m, "\t - use '-B 40' in 'wfb-ng' or any other tools\n");
+	RTW_PRINT_SEL(m, "\t - echo \"51 40\" > monitor_chan_override\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Disclaimer: Some chip may not lock on some frequency. There's no guarantee on performance. \n");
+	RTW_PRINT_SEL(m, "The unlocked frequency may damage your hardware.\n");
+	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
+
+	return 0;
+}
+
+static ssize_t proc_set_monitor_chan_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	char tmp[32];
+	u32 chan = 149;
+	u32 bw = 20, bw_cmd = 0;
+	u32 offset = 0;
+
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 2) {
+		RTW_INFO("monitor_chan_override Argument error. \n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u %u", &chan, &bw);
+		if (num < 1)
+			return count;
+	}
+	
+	if ((bw != 10) && (bw != 20) && (bw != 40) && (bw != 80)) {
+		RTW_INFO("monitor_chan_override Bandwidth error: %u\n", bw);
+		return count;
+	}
+	
+	switch (bw) {
+		case 10: bw_cmd = 6; break;
+		case 20: bw_cmd = 0; break;
+		case 40: bw_cmd = 1; break;	
+		case 80: bw_cmd = 2; break;
+		default: bw_cmd = 0; break;
+	}
+	
+	RTW_INFO("Write to monitor_chan_override: chan=%d, bw=%d, offset=%d\n", chan, bw, offset);
+	rtw_set_chbw_cmd(padapter, (u8)chan, bw_cmd, (u8)offset, RTW_CMDF_WAIT_ACK);
+
+	return count;
+}
+
+static int proc_get_edcca_threshold_jaguar3_override(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+
+	RTW_PRINT_SEL(m, "Set EDCCA Threshold Override For Realtek Jaguar3 Series (8723F/8735B/8730A/8822C/8812F/8197G/8822E/8198F/8814B/8814C)\n");
+	RTW_PRINT_SEL(m, "Github: JasonFreeLab/rtl88x2c\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Usage: echo \"<en> <dBm_l2h>\" > edcca_threshold_jaguar3_override\n");
+	RTW_PRINT_SEL(m, "\ten: 0-disable, 1-enable\n");
+	RTW_PRINT_SEL(m, "\tdBm_l2h: Energy CCA level in dBm, range: [-100, 7]; it's -72dBm (0xB0-248) by default from my adaptor's register.\n");
+	RTW_PRINT_SEL(m, "I don't know the actual range since I don't have the detailed datasheet with register definitions, but in theory it can be tuned in +7dBm ~ -240dBm. A threshold below -100dBm seems make no sense so I manually disabled them.\n");
+	RTW_PRINT_SEL(m, "Note: the H2L value is automatically set with 8dBm (default) lower as hysteresis.\n");
+	RTW_PRINT_SEL(m, "Note 2: It's a bit similar to the 'thresh62' patch in ath9k.\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "e.g.  To set the threshold to l2h=-40dBm (then h2l=-48dBm), use \n");
+	RTW_PRINT_SEL(m, "\techo \"1 -40\" > edcca_threshold_jaguar3_override\n");
+	RTW_PRINT_SEL(m, "e.g.  To disable, use \n");
+	RTW_PRINT_SEL(m, "\techo \"0 <any_number>\" > edcca_threshold_jaguar3_override\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Disclaimer: There's no guarantee on performance. \n");
+	RTW_PRINT_SEL(m, "This operation may damage your hardware.\n");
+	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Current value: %u %d\n", pregpriv->edcca_thresh_override_en, pregpriv->edcca_thresh_l2h_override);
+
+	return 0;
+}
+
+static ssize_t proc_set_edcca_threshold_jaguar3_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv *pregpriv = &padapter->registrypriv;
+	char tmp[32];
+	s32 edcca_thresh = -72;
+	u32 edcca_thresh_en = 0;
+
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 2) {
+		RTW_INFO("edcca_threshold_jaguar3_override Argument error. \n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u %d", &edcca_thresh_en, &edcca_thresh);
+		if (num < 1)
+			return count;
+	}
+	
+	if (edcca_thresh > 7 || edcca_thresh < -100) {
+		RTW_INFO("edcca_threshold_jaguar3_override dBm_l2h out of range: %d\n", edcca_thresh);
+		return count;
+	}
+	
+	if (edcca_thresh_en < 0 || edcca_thresh_en > 1) {
+		RTW_INFO("edcca_threshold_jaguar3_override en out of range: %d\n", edcca_thresh_en);
+		return count;
+	}
+	
+	if (edcca_thresh_en == 0) {
+		edcca_thresh = -72;	// set a default value here
+	}
+	
+	RTW_INFO("Write to edcca_threshold_jaguar3_override: EDCCA override %s, L2H threshold = %ddBm\n", (edcca_thresh_en==1)? "enabled": "disabled", edcca_thresh);
+	
+	pregpriv->edcca_thresh_override_en = (u8)edcca_thresh_en;
+	pregpriv->edcca_thresh_l2h_override = (s8)edcca_thresh;
+
+	return count;
+}
+
+static int proc_get_slottime_override(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+
+	RTW_PRINT_SEL(m, "Slot Time Override\n");
+	RTW_PRINT_SEL(m, "Github: JasonFreeLab/rtl88x2c\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "See DOI: 10.1109/TMC.2010.27 for why we need tuning this.\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Usage: echo \"<en> <slottime>\" > slottime_override\n");
+	RTW_PRINT_SEL(m, "en:			0-disable, 1-enable\n");
+	RTW_PRINT_SEL(m, "slottime_override:	us\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "e.g.  \n");
+	RTW_PRINT_SEL(m, "\techo \"1 5\" > slottime_override\n");
+	RTW_PRINT_SEL(m, "\techo \"0 <any_number>\" > slottime_override\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Disclaimer: There's no guarantee on performance. \n");
+	RTW_PRINT_SEL(m, "This operation may damage your hardware.\n");
+	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Current value: %u %u\n", pmlmeinfo->slottime_override_en, pmlmeinfo->slottime_override);
+	
+	return 0;
+}
+
+static ssize_t proc_set_slottime_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+	char tmp[32];
+	u32 en, slottime;
+
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 2) {
+		RTW_INFO("slottime_override Argument error. \n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u %u", &en, &slottime);
+		if (num < 1)
+			return count;
+	}
+	
+	if (slottime < 0 || en < 0 || en > 1) {
+		RTW_INFO("out of range: %d %d\n", en, slottime);
+		return count;
+	}
+	
+	if (en == 0) {
+		slottime = 9; // should be the default value
+	}
+	
+	pmlmeinfo->slottime_override = slottime; 
+	pmlmeinfo->slottime_override_en = en; 
+	//rtw_hal_set_hwreg(padapter, HW_VAR_SLOT_TIME, (u8 *)(&slottime));
+	
+	RTW_INFO("Write to slottime_override: %u, %u\n", en, slottime);
+
+	return count;
+}
+
+static int proc_get_sifs_override(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+	
+	RTW_PRINT_SEL(m, "SIFS Override\n");
+	RTW_PRINT_SEL(m, "Github: JasonFreeLab/rtl88x2c\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Usage: echo \"<en> <sifs>\" > sifs_override\n");
+	RTW_PRINT_SEL(m, "en: 0-disable, 1-enable\n");
+	RTW_PRINT_SEL(m, "sifs: SIFS time, in us\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "e.g.  \n");
+	RTW_PRINT_SEL(m, "\techo \"1 16\" > sifs_override\n");
+	RTW_PRINT_SEL(m, "\techo \"0 <any_number>\" > sifs_override\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Disclaimer: There's no guarantee on performance. \n");
+	RTW_PRINT_SEL(m, "This operation may damage your hardware.\n");
+	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
+	RTW_PRINT_SEL(m, "\n");
+	RTW_PRINT_SEL(m, "Current value: %u %u\n", pmlmeinfo->sifs_override_en, pmlmeinfo->sifs_override);
+
+	return 0;
+}
+
+static ssize_t proc_set_sifs_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+	char tmp[32];
+	u32 sifs_override, sifs_override_en;
+
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 2) {
+		RTW_INFO("sifs_override Argument error. \n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u %u", &sifs_override_en, &sifs_override);
+		if (num < 1)
+			return count;
+	}
+	
+	if (sifs_override < 0 || sifs_override_en < 0 || sifs_override_en > 1) {
+		RTW_INFO("out of range: %u %u\n", sifs_override_en, sifs_override);
+		return count;
+	}
+	
+	if (sifs_override_en == 0) {
+		sifs_override = 16;
+	}
+	
+	pmlmeinfo->sifs_override = sifs_override; 
+	pmlmeinfo->sifs_override_en = sifs_override_en; 
+	
+	RTW_INFO("Write to sifs_override: %u, %u\n", sifs_override_en, sifs_override);
+
+	return count;
+}
+
 static int proc_get_country_code(struct seq_file *m, void *v)
 {
 	struct net_device *dev = m->private;
@@ -1818,7 +2128,7 @@ ssize_t proc_set_macaddr_acl(struct file *file, const char __user *buffer, size_
 	if (!tmp)
 		return -ENOMEM;
 
-	if (count > (17 * NUM_ACL + 32)) {
+	if (count > sizeof(tmp)) {
 		rtw_warn_on(1);
 		count = -EFAULT;
 		goto exit;
@@ -2051,6 +2361,49 @@ exit:
 }
 
 #ifdef CONFIG_80211D
+static int proc_get_country_ie_slave_en_conds(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *adapter = (_adapter *)rtw_netdev_priv(dev);
+	struct rf_ctl_t *rfctl = adapter_to_rfctl(adapter);
+
+	RTW_PRINT_SEL(m, "%-4s %-5s\n", "role", "ifbmp");
+	RTW_PRINT_SEL(m, "0x%02x  0x%02x\n"
+		, rfctl->cis_en_role
+		, rfctl->cis_en_ifbmp
+	);
+
+	return 0;
+}
+
+static ssize_t proc_set_country_ie_slave_en_conds(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *adapter = (_adapter *)rtw_netdev_priv(dev);
+	struct rf_ctl_t *rfctl = adapter_to_rfctl(adapter);
+	char tmp[32];
+
+	if (count < 1)
+		return -EFAULT;
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		u8 role, ifbmp;
+		int num = sscanf(tmp, "%hhx %hhx", &role, &ifbmp);
+
+		if (num >= 1)
+			rfctl->cis_en_role = role;
+		if (num >= 2)
+			rfctl->cis_en_ifbmp = ifbmp;
+	}
+
+	return count;
+}
+
 static int proc_get_country_ie_slave_records(struct seq_file *m, void *v)
 {
 	struct net_device *dev = m->private;
@@ -2112,9 +2465,11 @@ ssize_t proc_set_update_non_ocp(struct file *file, const char __user *buffer, si
 {
 	struct net_device *dev = data;
 	_adapter *adapter = (_adapter *)rtw_netdev_priv(dev);
+	struct rtw_chset *chset = adapter_to_chset(adapter);
 	char tmp[32];
-	u8 band, ch, bw = CHANNEL_WIDTH_20, offset = CHAN_OFFSET_NO_EXT;
+	u8 band, ch, bw = CHANNEL_WIDTH_20, offset = HAL_PRIME_CHNL_OFFSET_DONT_CARE;
 	int ms = -1;
+	bool updated = 0;
 
 	if (count < 1)
 		return -EFAULT;
@@ -2131,7 +2486,20 @@ ssize_t proc_set_update_non_ocp(struct file *file, const char __user *buffer, si
 		if (num < 1 || (bw != CHANNEL_WIDTH_20 && num < 4))
 			goto exit;
 
-		rtw_rfctl_force_update_non_ocp_ms(adapter_to_rfctl(adapter), band, ch, bw, offset, ms);
+		if (bw == CHANNEL_WIDTH_20)
+			updated = rtw_chset_update_non_ocp_ms_by_band(chset
+				, band, ch, bw, HAL_PRIME_CHNL_OFFSET_DONT_CARE, ms);
+		else
+			updated = rtw_chset_update_non_ocp_ms_by_band(chset
+				, band, ch, bw, offset, ms);
+
+		if (updated) {
+			u8 i;
+			u8 cch = rtw_get_center_ch_by_band(band, ch, bw, offset);
+
+			for (i = HW_BAND_0; i < HW_BAND_MAX; i++)
+				rtw_nlrtw_nop_start_event(adapter_to_rfctl(adapter), i, band, cch, bw);
+		}
 	}
 
 exit:
@@ -2387,6 +2755,283 @@ static ssize_t proc_set_rx_chk_limit(struct file *file, const char __user *buffe
 	return count;
 }
 
+static ssize_t proc_set_thermal_state(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv *pregpriv = &padapter->registrypriv;
+	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
+	char tmp[32];
+	u32 offset_temp;
+
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 1) {
+		RTW_INFO("Set thermal_state Argument error. \n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%u", &offset_temp);
+		if (num < 1)
+			return count;
+	}
+	
+	if (offset_temp > 70) {
+		RTW_INFO("Set thermal_state Argument range error. \n");
+		return -EFAULT;
+	}
+	
+	RTW_INFO("Write to thermal_state offset tempC : %d\n", offset_temp);
+	pHalData->eeprom_thermal_offset_temperature = (u8)offset_temp;
+
+	return count;
+}
+
+
+static int proc_get_thermal_state(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+        struct dm_struct *p_dm_odm = adapter_to_phydm(padapter);
+        HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
+
+        u8 rx_cnt = rf_type_to_rf_rx_cnt(pHalData->rf_type);
+        int thermal_value = 0;
+        int thermal_offset = 0;
+        int temperature_offset = 32;	// measured value. see comment in commit/5b7a66d for details
+        int temperature = 0; 
+        u32 thermal_reg_mask = 0;
+	int rf_path = 0;
+
+        if (IS_8822C_SERIES(GET_HAL_DATA(padapter)->version_id)
+                || IS_8723F_SERIES(GET_HAL_DATA(padapter)->version_id)
+                || IS_8822E_SERIES(GET_HAL_DATA(padapter)->version_id))
+                        thermal_reg_mask = 0x007e;      /*0x42: RF Reg[6:1], 35332(themal K  & bias k & power trim) & 35325(tssi )*/
+        else
+                        thermal_reg_mask = 0xfc00;      /*0x42: RF Reg[15:10]*/
+
+	temperature_offset = (pHalData->eeprom_thermal_offset_temperature==0)? 
+				temperature_offset: pHalData->eeprom_thermal_offset_temperature;
+	
+        for(rf_path = 0; rf_path < rx_cnt; rf_path++)
+        {
+            // need to manually trigger the ADC conversion for latest data
+            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x1);
+            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x0);
+            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x1);
+
+            rtw_usleep_os(15);    // 15us in halrf_get_thermal_8822e()
+            
+            thermal_value = phy_query_rf_reg(padapter, rf_path, 0x42, thermal_reg_mask);
+            thermal_offset = pHalData->eeprom_thermal_meter_multi[rf_path];
+            temperature = (((thermal_value-thermal_offset) *5)/2) + temperature_offset;
+            RTW_PRINT_SEL(m, "rf_path: %d, thermal_value: %d, offset: %d, temperature: %d\n", rf_path, thermal_value, thermal_offset, temperature);
+        }
+
+        return 0;
+}
+
+#ifdef CONFIG_TX_DUTY
+static int proc_get_txduty_param(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct dvobj_priv *dvobj = padapter->dvobj;
+	struct tx_duty_t *tx_duty_ctrl = &(dvobj->tx_duty_ctrl);
+
+	RTW_PRINT_SEL(m, "enable : %d\n", tx_duty_ctrl->enable);
+	RTW_PRINT_SEL(m, "thermal thresold : %d ,thermal offset : %d\n", tx_duty_ctrl->thermal_thsold, tx_duty_ctrl->offset);
+	RTW_PRINT_SEL(m, "stage : %d \n", tx_duty_ctrl->stage);
+	RTW_PRINT_SEL(m, "manual mode : %d, dbg : %d\n", tx_duty_ctrl->manual_mode, tx_duty_ctrl->dbg);
+	RTW_PRINT_SEL(m, "pause: %d\n", tx_duty_ctrl->pause);
+
+	return 0;
+}
+
+static ssize_t proc_set_txduty_param(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = NULL;
+	struct dvobj_priv *dvobj = NULL;
+	struct tx_duty_t *tx_duty_ctrl = NULL;
+	int parm1 = 0, parm2 = 0, parm3 = 0;
+	char tmp[32] = {0};
+
+	if (dev == NULL)
+		return -EFAULT;
+
+	padapter = (_adapter *)rtw_netdev_priv(dev);
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 1) {
+		RTW_INFO("argument size is less than 1\n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	dvobj = padapter->dvobj;
+	tx_duty_ctrl = &(dvobj->tx_duty_ctrl);
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+
+		int num = sscanf(tmp, "%d %d %d", &parm1, &parm2, &parm3);
+
+		if (num !=  3) {
+			RTW_INFO("invalid input parameter number!\n");
+			return count;
+		}
+		tx_duty_ctrl->thermal_thsold = parm1;
+		tx_duty_ctrl->stage = parm2;
+		tx_duty_ctrl->offset = parm3;
+	}
+
+	RTW_INFO("%s thermal_thsold=%d stage=%d offset=%d\n",
+		__func__, tx_duty_ctrl->thermal_thsold, tx_duty_ctrl->stage, tx_duty_ctrl->offset);
+
+	return count;
+}
+static int proc_get_txduty_manual(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct dvobj_priv *dvobj = padapter->dvobj;
+	struct tx_duty_t *tx_duty_ctrl = &(dvobj->tx_duty_ctrl);
+
+	RTW_PRINT_SEL(m, "enable : %d\n", tx_duty_ctrl->enable);
+	RTW_PRINT_SEL(m, "stage : %d \n", tx_duty_ctrl->stage);
+	RTW_PRINT_SEL(m, "manual mode : %d\n", tx_duty_ctrl->manual_mode);
+	RTW_PRINT_SEL(m, "curr_tx_rate : %d\n", tx_duty_ctrl->curr_tx_rate);
+	RTW_PRINT_SEL(m, "curr_tx_rate_2ss : %d\n", tx_duty_ctrl->curr_tx_rate_2ss);
+	RTW_PRINT_SEL(m, "thermal thresold : %d\n", tx_duty_ctrl->thermal_thsold);
+	return 0;
+}
+
+static ssize_t proc_set_txduty_manual(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = NULL;
+	struct dvobj_priv *dvobj = NULL;
+	struct tx_duty_t *tx_duty_ctrl = NULL;
+	int parm1 = 0, parm2 = 0, parm3 = 0, parm4 = 0, parm5;
+	char tmp[32] = {0};
+
+	if (dev == NULL)
+		return -EFAULT;
+
+	padapter = (_adapter *)rtw_netdev_priv(dev);
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 1) {
+		RTW_INFO("argument size is less than 1\n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	dvobj = padapter->dvobj;
+	tx_duty_ctrl = &(dvobj->tx_duty_ctrl);
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+
+		int num = sscanf(tmp, "%d %d %d", &parm1, &parm2, &parm3);
+
+		if (num != 3) {
+			RTW_INFO("invalid input parameter number!\n");
+			return count;
+		}
+
+		tx_duty_ctrl->manual_mode = parm1;
+		tx_duty_ctrl->enable = parm2;
+		tx_duty_ctrl->stage = parm3;
+
+
+		if (tx_duty_ctrl->manual_mode == _FALSE) {
+			/* set to default value */
+			tx_duty_ctrl->enable = _FALSE;
+			tx_duty_ctrl->stage = CONFIG_DUTY_CLCLE;
+		}
+		rtw_hal_set_tx_duty_cmd(padapter);
+	}
+
+	RTW_INFO("%s enable: %d, manual_mode: %d stage=%d\n",
+		__func__, tx_duty_ctrl->enable, tx_duty_ctrl->manual_mode, tx_duty_ctrl->stage);
+
+	return count;
+}
+
+static int proc_get_txduty_dbg(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct dvobj_priv *dvobj = padapter->dvobj;
+	struct tx_duty_t *tx_duty_ctrl = &(dvobj->tx_duty_ctrl);
+
+	RTW_PRINT_SEL(m, "dbg : %d\n", tx_duty_ctrl->dbg);
+	return 0;
+}
+
+static ssize_t proc_set_txduty_dbg(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = NULL;
+	struct dvobj_priv *dvobj = NULL;
+	struct tx_duty_t *tx_duty_ctrl = NULL;
+	int var = 0;
+	char tmp[32];
+
+	if (dev == NULL)
+		return -EFAULT;
+
+	padapter = (_adapter *)rtw_netdev_priv(dev);
+	if (!padapter)
+		return -EFAULT;
+
+	if (count < 1) {
+		RTW_INFO("argument size is less than 1\n");
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	dvobj = padapter->dvobj;
+	tx_duty_ctrl = &(dvobj->tx_duty_ctrl);
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+
+		int num = sscanf(tmp, "%d", &var);
+
+		if (num !=  1) {
+			RTW_INFO("invalid input parameter number!\n");
+			return count;
+		}
+
+	}
+	tx_duty_ctrl->dbg = var;
+
+	return count;
+
+}
+#endif /* CONFIG_TX_DUTY */
+
 static int proc_get_udpport(struct seq_file *m, void *v)
 {
 	struct net_device *dev = m->private;
@@ -2400,15 +3045,13 @@ static ssize_t proc_set_udpport(struct file *file, const char __user *buffer, si
 {
 	struct net_device *dev = data;
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct recv_priv *precvpriv;
+	struct recv_priv *precvpriv = &(padapter->recvpriv);
 	int sink_udpport = 0;
 	char tmp[32];
 
 
 	if (!padapter)
 		return -EFAULT;
-
-	precvpriv = &(padapter->recvpriv);
 
 	if (count < 1) {
 		RTW_INFO("argument size is less than 1\n");
@@ -2431,9 +3074,6 @@ static ssize_t proc_set_udpport(struct file *file, const char __user *buffer, si
 
 	}
 	precvpriv->sink_udpport = sink_udpport;
-	precvpriv->pre_rtp_rxseq = 0;
-	precvpriv->cur_rtp_rxseq = 0;
-	precvpriv->rtp_drop_count = 0;
 
 	return count;
 
@@ -2805,7 +3445,7 @@ static void rtw_set_tx_bw_mode(struct _ADAPTER *adapter, u8 bw_mode)
 		for (i = 0; i < MACID_NUM_SW_LIMIT; i++) {
 			sta = macid_ctl->sta[i];
 			if (sta && !is_broadcast_mac_addr(sta->cmn.mac_addr))
-				rtw_dm_ra_mask_wk_cmd(adapter, sta);
+				rtw_dm_ra_mask_wk_cmd(adapter, (u8 *)sta);
 		}
 	}
 }
@@ -3081,7 +3721,7 @@ static int proc_get_tx_power_idx(struct seq_file *m, void *v)
 		RTW_INFO("%s path=%u, rs=%u\n", __func__, path, rs);
 
 	if (path == RF_PATH_A && rs == CCK)
-		dump_tx_power_idx_title(m, adapter, bw, 0, 0);
+		dump_tx_power_idx_title(m, adapter, bw, cch, 0);
 	dump_tx_power_idx_by_path_rs(m, adapter, path, rs, bw, cch, 0);
 
 	return 0;
@@ -3160,7 +3800,7 @@ static int proc_get_txpwr_total_dbm(struct seq_file *m, void *v)
 	u8 cch = hal_data->current_channel;
 
 	if (rs == CCK)
-		dump_txpwr_total_dbm_title(m, adapter, bw, 0, 0);
+		dump_txpwr_total_dbm_title(m, adapter, bw, cch, 0);
 	dump_txpwr_total_dbm_by_rs(m, adapter, rs, bw, cch, 0);
 
 	return 0;
@@ -3932,7 +4572,7 @@ static ssize_t proc_set_nm(struct file *file, const char __user *buffer, size_t 
 		if (num < 1)
 			return -EINVAL;
 
-		if (nm_state)
+		if (nm_state) 
 			rtw_nm_enable(padapter);
 		else
 			rtw_nm_disable(padapter);
@@ -5394,330 +6034,41 @@ static ssize_t proc_set_amsdu_mode(struct file *file, const char __user *buffer,
 
 }
 
-static int proc_get_monitor_chan_override(struct seq_file *m, void *v)
+static int proc_get_dis_cca(struct seq_file *m, void *v)
 {
 	struct net_device *dev = m->private;
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
+	u32 bit_dis_cca;
+	
+	if (!padapter)
+		return -EFAULT;
+		
+	dm = adapter_to_phydm(padapter);
 
-	RTW_PRINT_SEL(m, "Usage: echo \"<chan> <bw>\" > monitor_chan_override\n");
-	RTW_PRINT_SEL(m, "chan:	16~253, freq=channel*5+5000\n");
-	RTW_PRINT_SEL(m, "bw:	10/20/40/80, MHz. Not determing the bandwidth, but should be the same as 'iw'\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "e.g. \n");
-	RTW_PRINT_SEL(m, "1. To transmit in 6005MHz with 10MHz BW, you should: \n");
-	RTW_PRINT_SEL(m, "\t - use 'iw' to set the bandwidth to 10MHz in any channel \n");
-	RTW_PRINT_SEL(m, "\t - use '-B 20' in 'wfb-ng' or any other tools\n");
-	RTW_PRINT_SEL(m, "\t - echo \"201 10\" > monitor_chan_override\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "2. To transmit in 5080MHz with 20MHz BW: \n");
-	RTW_PRINT_SEL(m, "\t - use 'iw' to set the bandwidth to 20MHz in any channel \n");
-	RTW_PRINT_SEL(m, "\t - use '-B 20' in 'wfb-ng' or any other tools\n");
-	RTW_PRINT_SEL(m, "\t - echo \"16 20\" > monitor_chan_override\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "3. To transmit in 5255MHz with 40MHz BW: \n");
-	RTW_PRINT_SEL(m, "\t - use 'iw' to set the bandwidth to HT40 in any channel \n");
-	RTW_PRINT_SEL(m, "\t - use '-B 40' in 'wfb-ng' or any other tools\n");
-	RTW_PRINT_SEL(m, "\t - echo \"51 40\" > monitor_chan_override\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Disclaimer: Some chip may not lock on some frequency. There's no guarantee on performance. \n");
-	RTW_PRINT_SEL(m, "The unlocked frequency may damage your hardware.\n");
-	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
+	bit_dis_cca = odm_get_mac_reg(dm, R_0x520, BIT(15));
+	
+	RTW_PRINT_SEL(m, "BIT_DIS_EDCCA = %d, CCA %s\n", bit_dis_cca, bit_dis_cca? "disabled": "enabled");
 
 	return 0;
 }
 
-static ssize_t proc_set_monitor_chan_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+static ssize_t proc_set_dis_cca(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	char tmp[32];
-	u32 chan = 149;
-	u32 bw = 20, bw_cmd = 0;
-	u32 offset = 0;
-
-	if (!padapter)
-		return -EFAULT;
-
-	if (count < 2) {
-		RTW_INFO("monitor_chan_override Argument error. \n");
-		return -EFAULT;
-	}
-
-	if (count > sizeof(tmp)) {
-		rtw_warn_on(1);
-		return -EFAULT;
-	}
-
-	if (buffer && !copy_from_user(tmp, buffer, count)) {
-		int num = sscanf(tmp, "%u %u", &chan, &bw);
-		if (num < 1)
-			return count;
-	}
-	
-	if ((bw != 10) && (bw != 20) && (bw != 40) && (bw != 80)) {
-		RTW_INFO("monitor_chan_override Bandwidth error: %u\n", bw);
-		return count;
-	}
-	
-	switch (bw) {
-		case 10: bw_cmd = 6; break;
-		case 20: bw_cmd = 0; break;
-		case 40: bw_cmd = 1; break;	
-		case 80: bw_cmd = 2; break;
-		default: bw_cmd = 0; break;
-	}
-	
-	RTW_INFO("Write to monitor_chan_override: chan=%d, bw=%d, offset=%d\n", chan, bw, offset);
-	rtw_set_chbw_cmd(padapter, (u8)chan, bw_cmd, (u8)offset, RTW_CMDF_WAIT_ACK);
-
-	return count;
-}
-
-static int proc_get_edcca_threshold_jaguar3_override(struct seq_file *m, void *v)
-{
-	struct net_device *dev = m->private;
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct registry_priv	*pregpriv = &padapter->registrypriv;
-
-	RTW_PRINT_SEL(m, "Set EDCCA Threshold Override For Realtek Jaguar3 Series (8723F/8735B/8730A/8822C/8812F/8197G/8822E/8198F/8814B/8814C)\n");
-	RTW_PRINT_SEL(m, "Github: JasonFreeLab\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Usage: echo \"<en> <dBm_l2h>\" > edcca_threshold_jaguar3_override\n");
-	RTW_PRINT_SEL(m, "\ten: 0-disable, 1-enable\n");
-	RTW_PRINT_SEL(m, "\tdBm_l2h: Energy CCA level in dBm, range: [-100, 7]; it's -72dBm (0xB0-248) by default from my adaptor's register.\n");
-	RTW_PRINT_SEL(m, "I don't know the actual range since I don't have the detailed datasheet with register definitions, but in theory it can be tuned in +7dBm ~ -240dBm. A threshold below -100dBm seems make no sense so I manually disabled them.\n");
-	RTW_PRINT_SEL(m, "Note: the H2L value is automatically set with 8dBm (default) lower as hysteresis.\n");
-	RTW_PRINT_SEL(m, "Note 2: It's a bit similar to the 'thresh62' patch in ath9k.\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "e.g.  To set the threshold to l2h=-40dBm (then h2l=-48dBm), use \n");
-	RTW_PRINT_SEL(m, "\techo \"1 -40\" > edcca_threshold_jaguar3_override\n");
-	RTW_PRINT_SEL(m, "e.g.  To disable, use \n");
-	RTW_PRINT_SEL(m, "\techo \"0 <any_number>\" > edcca_threshold_jaguar3_override\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Disclaimer: There's no guarantee on performance. \n");
-	RTW_PRINT_SEL(m, "This operation may damage your hardware.\n");
-	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Current value: %u %d\n", pregpriv->edcca_thresh_override_en, pregpriv->edcca_thresh_l2h_override);
-
-	return 0;
-}
-
-static ssize_t proc_set_edcca_threshold_jaguar3_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
-{
-	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct registry_priv *pregpriv = &padapter->registrypriv;
+	struct dm_struct *dm;
 	char tmp[32];
-	s32 edcca_thresh = -72;
-	u32 edcca_thresh_en = 0;
+	u32 en;
 
-	if (!padapter)
-		return -EFAULT;
-
-	if (count < 2) {
-		RTW_INFO("edcca_threshold_jaguar3_override Argument error. \n");
-		return -EFAULT;
-	}
-
-	if (count > sizeof(tmp)) {
-		rtw_warn_on(1);
-		return -EFAULT;
-	}
-
-	if (buffer && !copy_from_user(tmp, buffer, count)) {
-		int num = sscanf(tmp, "%u %d", &edcca_thresh_en, &edcca_thresh);
-		if (num < 1)
-			return count;
-	}
-	
-	if (edcca_thresh > 7 || edcca_thresh < -100) {
-		RTW_INFO("edcca_threshold_jaguar3_override dBm_l2h out of range: %d\n", edcca_thresh);
-		return count;
-	}
-	
-	if (edcca_thresh_en < 0 || edcca_thresh_en > 1) {
-		RTW_INFO("edcca_threshold_jaguar3_override en out of range: %d\n", edcca_thresh_en);
-		return count;
-	}
-	
-	if (edcca_thresh_en == 0) {
-		edcca_thresh = -72;	// set a default value here
-	}
-	
-	RTW_INFO("Write to edcca_threshold_jaguar3_override: EDCCA override %s, L2H threshold = %ddBm\n", (edcca_thresh_en==1)? "enabled": "disabled", edcca_thresh);
-	
-	pregpriv->edcca_thresh_override_en = (u8)edcca_thresh_en;
-	pregpriv->edcca_thresh_l2h_override = (s8)edcca_thresh;
-
-	return count;
-}
-
-static int proc_get_slottime_override(struct seq_file *m, void *v)
-{
-	struct net_device *dev = m->private;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct registry_priv	*pregpriv = &padapter->registrypriv;
-	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-
-	RTW_PRINT_SEL(m, "Slot Time Override\n");
-	RTW_PRINT_SEL(m, "Github: JasonFreeLab\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "See DOI: 10.1109/TMC.2010.27 for why we need tuning this.\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Usage: echo \"<en> <slottime>\" > slottime_override\n");
-	RTW_PRINT_SEL(m, "en:			0-disable, 1-enable\n");
-	RTW_PRINT_SEL(m, "slottime_override:	us\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "e.g.  \n");
-	RTW_PRINT_SEL(m, "\techo \"1 5\" > slottime_override\n");
-	RTW_PRINT_SEL(m, "\techo \"0 <any_number>\" > slottime_override\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Disclaimer: There's no guarantee on performance. \n");
-	RTW_PRINT_SEL(m, "This operation may damage your hardware.\n");
-	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Current value: %u %u\n", pmlmeinfo->slottime_override_en, pmlmeinfo->slottime_override);
-	
-	return 0;
-}
-
-static ssize_t proc_set_slottime_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
-{
-	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-	char tmp[32];
-	u32 en, slottime;
-
-	if (!padapter)
-		return -EFAULT;
-
-	if (count < 2) {
-		RTW_INFO("slottime_override Argument error. \n");
-		return -EFAULT;
-	}
-
-	if (count > sizeof(tmp)) {
-		rtw_warn_on(1);
-		return -EFAULT;
-	}
-
-	if (buffer && !copy_from_user(tmp, buffer, count)) {
-		int num = sscanf(tmp, "%u %u", &en, &slottime);
-		if (num < 1)
-			return count;
-	}
-	
-	if (slottime < 0 || en < 0 || en > 1) {
-		RTW_INFO("out of range: %d %d\n", en, slottime);
-		return count;
-	}
-	
-	if (en == 0) {
-		slottime = 9; // should be the default value
-	}
-	
-	pmlmeinfo->slottime_override = slottime; 
-	pmlmeinfo->slottime_override_en = en; 
-	//rtw_hal_set_hwreg(padapter, HW_VAR_SLOT_TIME, (u8 *)(&slottime));
-	
-	RTW_INFO("Write to slottime_override: %u, %u\n", en, slottime);
-
-	return count;
-}
-
-static int proc_get_sifs_override(struct seq_file *m, void *v)
-{
-	struct net_device *dev = m->private;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct registry_priv	*pregpriv = &padapter->registrypriv;
-	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-	
-	RTW_PRINT_SEL(m, "SIFS Override\n");
-	RTW_PRINT_SEL(m, "Github: JasonFreeLab\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Usage: echo \"<en> <sifs>\" > sifs_override\n");
-	RTW_PRINT_SEL(m, "en: 0-disable, 1-enable\n");
-	RTW_PRINT_SEL(m, "sifs: SIFS time, in us\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "e.g.  \n");
-	RTW_PRINT_SEL(m, "\techo \"1 16\" > sifs_override\n");
-	RTW_PRINT_SEL(m, "\techo \"0 <any_number>\" > sifs_override\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Disclaimer: There's no guarantee on performance. \n");
-	RTW_PRINT_SEL(m, "This operation may damage your hardware.\n");
-	RTW_PRINT_SEL(m, "You should obey the law, and use it at your own risk.\n");
-	RTW_PRINT_SEL(m, "\n");
-	RTW_PRINT_SEL(m, "Current value: %u %u\n", pmlmeinfo->sifs_override_en, pmlmeinfo->sifs_override);
-
-	return 0;
-}
-
-static ssize_t proc_set_sifs_override(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
-{
-	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-	char tmp[32];
-	u32 sifs_override, sifs_override_en;
-
-	if (!padapter)
-		return -EFAULT;
-
-	if (count < 2) {
-		RTW_INFO("sifs_override Argument error. \n");
-		return -EFAULT;
-	}
-
-	if (count > sizeof(tmp)) {
-		rtw_warn_on(1);
-		return -EFAULT;
-	}
-
-	if (buffer && !copy_from_user(tmp, buffer, count)) {
-		int num = sscanf(tmp, "%u %u", &sifs_override_en, &sifs_override);
-		if (num < 1)
-			return count;
-	}
-	
-	if (sifs_override < 0 || sifs_override_en < 0 || sifs_override_en > 1) {
-		RTW_INFO("out of range: %u %u\n", sifs_override_en, sifs_override);
-		return count;
-	}
-	
-	if (sifs_override_en == 0) {
-		sifs_override = 16;
-	}
-	
-	pmlmeinfo->sifs_override = sifs_override; 
-	pmlmeinfo->sifs_override_en = sifs_override_en; 
-	
-	RTW_INFO("Write to sifs_override: %u, %u\n", sifs_override_en, sifs_override);
-
-	return count;
-}
-
-
-static ssize_t proc_set_thermal_state(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
-{
-	struct net_device *dev = data;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-	struct registry_priv *pregpriv = &padapter->registrypriv;
-	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
-	char tmp[32];
-	u32 offset_temp;
-
+	dm = adapter_to_phydm(padapter);
 	if (!padapter)
 		return -EFAULT;
 
 	if (count < 1) {
-		RTW_INFO("Set thermal_state Argument error. \n");
+		RTW_INFO("Set dis_cca Argument error.\n");
 		return -EFAULT;
 	}
 
@@ -5727,64 +6078,42 @@ static ssize_t proc_set_thermal_state(struct file *file, const char __user *buff
 	}
 
 	if (buffer && !copy_from_user(tmp, buffer, count)) {
-		int num = sscanf(tmp, "%u", &offset_temp);
+		int num = sscanf(tmp, "%u", &en);
 		if (num < 1)
 			return count;
 	}
 	
-	if (offset_temp > 70) {
-		RTW_INFO("Set thermal_state Argument range error. \n");
+	if (en != 0 && en != 1) {
+		RTW_INFO("Set dis_cca Argument range error.\n");
 		return -EFAULT;
 	}
 	
-	RTW_INFO("Write to thermal_state offset tempC : %d\n", offset_temp);
-	pHalData->eeprom_thermal_offset_temperature = (u8)offset_temp;
+	if (en == 1) {
+		// mac bit_dis_edcca 
+		odm_set_mac_reg(dm, R_0x520, BIT(15), 1);
+		// mac bit_edcca_msk_countdown
+		odm_set_mac_reg(dm, R_0x524, BIT(11), 0);
+		// bb cck cca
+		odm_set_bb_reg(dm, R_0x1a9c, BIT(20), 0x0);
+		odm_set_bb_reg(dm, R_0x1a14, 0x300, 0x3);
+		// bb ofdm cca 
+		odm_set_bb_reg(dm, R_0x1d58, 0xff8, 0x1ff);	
+	} else {
+		// mac bit_dis_edcca 
+		odm_set_mac_reg(dm, R_0x520, BIT(15), 0);
+		// mac bit_edcca_msk_countdown
+		odm_set_mac_reg(dm, R_0x524, BIT(11), 1);
+		// bb cck cca
+		odm_set_bb_reg(dm, R_0x1a9c, BIT(20), 0x1);
+		odm_set_bb_reg(dm, R_0x1a14, 0x300, 0x0);
+		// bb ofdm cca
+		odm_set_bb_reg(dm, R_0x1d58, 0xff8, 0x0);
+	}
+	
+
+	RTW_INFO("Write to dis_cca: %d, %s cca\n", en, (en==1)? "disabled": "enabled");
 
 	return count;
-}
-
-
-static int proc_get_thermal_state(struct seq_file *m, void *v)
-{
-	struct net_device *dev = m->private;
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
-        struct dm_struct *p_dm_odm = adapter_to_phydm(padapter);
-        HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
-
-        u8 rx_cnt = rf_type_to_rf_rx_cnt(pHalData->rf_type);
-        int thermal_value = 0;
-        int thermal_offset = 0;
-        int temperature_offset = 32;	// TO-DO: measure that value
-        int temperature = 0; 
-        u32 thermal_reg_mask = 0;
-	int rf_path = 0;
-
-        if (IS_8822C_SERIES(GET_HAL_DATA(padapter)->version_id)
-                || IS_8723F_SERIES(GET_HAL_DATA(padapter)->version_id)
-                || IS_8822E_SERIES(GET_HAL_DATA(padapter)->version_id))
-                        thermal_reg_mask = 0x007e;      /*0x42: RF Reg[6:1], 35332(themal K  & bias k & power trim) & 35325(tssi )*/
-        else
-                        thermal_reg_mask = 0xfc00;      /*0x42: RF Reg[15:10]*/
-
-	temperature_offset = (pHalData->eeprom_thermal_offset_temperature==0)? 
-				temperature_offset: pHalData->eeprom_thermal_offset_temperature;
-	
-        for(rf_path = 0; rf_path < rx_cnt; rf_path++)
-        {
-            // need to manually trigger the ADC conversion for latest data
-            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x1);
-            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x0);
-            phy_set_rf_reg(padapter, rf_path, 0x42, BIT19, 0x1);
-
-            rtw_usleep_os(15);    // 15us in halrf_get_thermal_8822e()
-            
-            thermal_value = phy_query_rf_reg(padapter, rf_path, 0x42, thermal_reg_mask);
-            thermal_offset = pHalData->eeprom_thermal_meter_multi[rf_path];
-            temperature = (((thermal_value-thermal_offset) *5)/2) + temperature_offset;
-            RTW_PRINT_SEL(m, "rf_path: %d, thermal_value: %d, offset: %d, temperature: %d\n", rf_path, thermal_value, thermal_offset, temperature);
-        }
-
-        return 0;
 }
 
 static int proc_get_single_tone(struct seq_file *m, void *v)
@@ -5794,13 +6123,13 @@ static int proc_get_single_tone(struct seq_file *m, void *v)
 	struct registry_priv	*pregpriv = &padapter->registrypriv;
 	struct dm_struct *dm;
 	u32 bit_dis_cca;
-
+	
 	if (!padapter)
 		return -EFAULT;
-
+		
 	dm = adapter_to_phydm(padapter);
 
-
+	
 	RTW_PRINT_SEL(m, "single_tone: <en:0(dis)/1(en)> <rf_path:0(A)/1(B)/4(AB)>\n");
 
 	return 0;
@@ -5816,10 +6145,10 @@ static ssize_t proc_set_single_tone(struct file *file, const char __user *buffer
 	u32 en, rf_path;
 	
 	dm = adapter_to_phydm(padapter);
-	
+
 	if (!padapter)
 		return -EFAULT;
-
+		
 	if (count < 2) {
 		RTW_INFO("Set single_tone Argument error.\n");
 		return -EFAULT;
@@ -5835,23 +6164,23 @@ static ssize_t proc_set_single_tone(struct file *file, const char __user *buffer
 		if (num < 1)
 			return count;
 	}
-
+	
 	if (rf_path != RF_PATH_A && rf_path != RF_PATH_B && rf_path != RF_PATH_AB) {
 		RTW_INFO("Set single_tone rf_path Argument range error.\n");
 		return -EFAULT;
 	}
-
+	
 	if (en != 0 && en != 1) {
 		RTW_INFO("Set single_tone en Argument range error.\n");
 		return -EFAULT;
 	}
-
+	
 	if (en == 1) {
 		phydm_mp_set_single_tone(dm, true, rf_path);
 	} else {
 		phydm_mp_set_single_tone(dm, false, rf_path);
 	}
-
+	
 	RTW_INFO("Write to single_tone: en %d, path %d\n", en, rf_path);
 
 	return count;
@@ -5866,8 +6195,10 @@ static int proc_get_bf_monitor_conf(struct seq_file *m, void *v)
 	if (!padapter)
 		return -EFAULT;
         bf_monitor_print_conf(padapter, m);
+
 	return 0;
 }
+
 static ssize_t proc_set_bf_monitor_conf(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 	struct net_device *dev = data;
@@ -5882,10 +6213,13 @@ static ssize_t proc_set_bf_monitor_conf(struct file *file, const char __user *bu
         u8 bfer_g_id;       // Group ID, 0 or 63
 	
 	dm = adapter_to_phydm(padapter);
+
 	if (!padapter)
 		return -EFAULT;
+
 	if (count > sizeof(tmp)) 
 		goto show_usage;
+
 	if (buffer && !copy_from_user(tmp, buffer, count)) {
 		num = sscanf(tmp, "%d", &action);
 		if (num < 1)
@@ -5905,7 +6239,9 @@ static ssize_t proc_set_bf_monitor_conf(struct file *file, const char __user *bu
             RTW_INFO("%s: Write to bf_monitor_conf: arg error \n", __FUNCTION__);
             goto show_usage;
         }
+
 	return count;
+
 show_usage:
 	// Print usage to dmesg
 	RTW_INFO("bf_monitor_conf Usage: \n");
@@ -5914,6 +6250,7 @@ show_usage:
 	RTW_INFO("\techo \"1 00:11:22:33:44:55 0 0\" > bf_monitor_conf \n");
 	return -EFAULT;
 }
+
 static int proc_get_bf_monitor_trig(struct seq_file *m, void *v)
 {
 	struct net_device *dev = m->private;
@@ -5921,10 +6258,12 @@ static int proc_get_bf_monitor_trig(struct seq_file *m, void *v)
 	
 	if (!padapter)
 		return -EFAULT;
+
         bf_monitor_print_cbr(padapter, m);
         
 	return 0;
 }
+
 static ssize_t proc_set_bf_monitor_trig(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 	struct net_device *dev = data;
@@ -5942,10 +6281,13 @@ static ssize_t proc_set_bf_monitor_trig(struct file *file, const char __user *bu
         u8 bw_int;
 	
 	dm = adapter_to_phydm(padapter);
+
 	if (!padapter)
 		return -EFAULT;
+
 	if (count > sizeof(tmp)) 
 		goto show_usage;
+
 	if (buffer && !copy_from_user(tmp, buffer, count)) {
 		int num = sscanf(tmp, "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx %hu %hhu %hhu %hhu", 
 		    &bfer_macaddr[0], &bfer_macaddr[1], &bfer_macaddr[2], &bfer_macaddr[3], &bfer_macaddr[4], &bfer_macaddr[5],
@@ -5984,6 +6326,8 @@ show_usage:
 	
         return -EFAULT;
 }
+
+
 static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 	struct net_device *dev = data;
@@ -5995,8 +6339,10 @@ static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buff
 	
 	if (!padapter)
 		return -EFAULT;
+
 	if (count > sizeof(tmp)) 
 		return -EFAULT;
+
 	if (buffer && !copy_from_user(tmp, buffer, count)) {
 		int num = sscanf(tmp, "%hhu", &en);
 		if (num < 1)
@@ -6008,16 +6354,15 @@ static ssize_t proc_set_bf_monitor_en(struct file *file, const char __user *buff
 	return count;
 }
 #endif
+
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
 */
 const struct rtw_proc_hdl adapter_proc_hdls[] = {
-	RTW_PROC_HDL_SSEQ("thermal_state", proc_get_thermal_state, proc_set_thermal_state),
-	RTW_PROC_HDL_SSEQ("monitor_chan_override", proc_get_monitor_chan_override, proc_set_monitor_chan_override),
-	RTW_PROC_HDL_SSEQ("edcca_threshold_jaguar3_override", proc_get_edcca_threshold_jaguar3_override, proc_set_edcca_threshold_jaguar3_override),
-	RTW_PROC_HDL_SSEQ("slottime_override", proc_get_slottime_override, proc_set_slottime_override),
-	RTW_PROC_HDL_SSEQ("sifs_override", proc_get_sifs_override, proc_set_sifs_override),
+        RTW_PROC_HDL_SSEQ("thermal_state", proc_get_thermal_state, proc_set_thermal_state),
+        RTW_PROC_HDL_SSEQ("dis_cca", proc_get_dis_cca, proc_set_dis_cca),
+        RTW_PROC_HDL_SSEQ("single_tone", proc_get_single_tone, proc_set_single_tone),
 #ifdef CONFIG_BEAMFORMING_MONITOR
         RTW_PROC_HDL_SSEQ("bf_monitor_conf", proc_get_bf_monitor_conf, proc_set_bf_monitor_conf),
         RTW_PROC_HDL_SSEQ("bf_monitor_trig", proc_get_bf_monitor_trig, proc_set_bf_monitor_trig),
@@ -6079,7 +6424,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("cell_data", rtw_mbo_proc_cell_data_get, rtw_mbo_proc_cell_data_set),
 	RTW_PROC_HDL_SSEQ("mbo_attr", rtw_mbo_proc_attr_get, rtw_mbo_proc_attr_set),
 #endif
-#if defined(CONFIG_IOCTL_CFG80211) && defined(CONFIG_RTW_80211R)
+#ifdef CONFIG_RTW_80211R
 	RTW_PROC_HDL_SSEQ("ft_flags", rtw_ft_proc_flags_get, rtw_ft_proc_flags_set),
 #endif
 	RTW_PROC_HDL_SSEQ("defs_param", proc_get_defs_param, proc_set_defs_param),
@@ -6260,6 +6605,10 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("country_code", proc_get_country_code, proc_set_country_code),
 	RTW_PROC_HDL_SSEQ("chan_plan", proc_get_chan_plan, proc_set_chan_plan),
 	RTW_PROC_HDL_SSEQ("chplan_confs", proc_get_chplan_confs, proc_set_chplan_confs),
+	RTW_PROC_HDL_SSEQ("monitor_chan_override", proc_get_monitor_chan_override, proc_set_monitor_chan_override),
+	RTW_PROC_HDL_SSEQ("edcca_threshold_jaguar3_override", proc_get_edcca_threshold_jaguar3_override, proc_set_edcca_threshold_jaguar3_override),
+	RTW_PROC_HDL_SSEQ("slottime_override", proc_get_slottime_override, proc_set_slottime_override),
+	RTW_PROC_HDL_SSEQ("sifs_override", proc_get_sifs_override, proc_set_sifs_override),
 	RTW_PROC_HDL_SSEQ("cap_spt_op_class_ch", proc_get_cap_spt_op_class_ch, proc_set_cap_spt_op_class_ch),
 	RTW_PROC_HDL_SSEQ("reg_spt_op_class_ch", proc_get_reg_spt_op_class_ch, proc_set_reg_spt_op_class_ch),
 	RTW_PROC_HDL_SSEQ("cur_spt_op_class_ch", proc_get_cur_spt_op_class_ch, proc_set_cur_spt_op_class_ch),
@@ -6271,6 +6620,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 #endif
 	RTW_PROC_HDL_SSEQ("ch_sel_policy", proc_get_ch_sel_policy, proc_set_ch_sel_policy),
 #ifdef CONFIG_80211D
+	RTW_PROC_HDL_SSEQ("country_ie_slave_en_conds", proc_get_country_ie_slave_en_conds, proc_set_country_ie_slave_en_conds),
 	RTW_PROC_HDL_SSEQ("country_ie_slave_records", proc_get_country_ie_slave_records, NULL),
 #endif
 #ifdef CONFIG_DFS_MASTER
@@ -6286,6 +6636,11 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 #ifdef CONFIG_BCN_CNT_CONFIRM_HDL
 	RTW_PROC_HDL_SSEQ("new_bcn_max", proc_get_new_bcn_max, proc_set_new_bcn_max),
 #endif
+#ifdef CONFIG_TX_DUTY
+	RTW_PROC_HDL_SSEQ("tx_duty_param", proc_get_txduty_param, proc_set_txduty_param),
+	RTW_PROC_HDL_SSEQ("tx_duty_manual", proc_get_txduty_manual, proc_set_txduty_manual),
+	RTW_PROC_HDL_SSEQ("tx_duty_dbg", proc_get_txduty_dbg, proc_set_txduty_dbg),
+#endif /* CONFIG_TX_DUTY */
 	RTW_PROC_HDL_SSEQ("sink_udpport", proc_get_udpport, proc_set_udpport),
 #ifdef DBG_RX_COUNTER_DUMP
 	RTW_PROC_HDL_SSEQ("dump_rx_cnt_mode", proc_get_rx_cnt_dump, proc_set_rx_cnt_dump),
@@ -6340,8 +6695,9 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 #ifdef CONFIG_BACKGROUND_NOISE_MONITOR
 	RTW_PROC_HDL_SSEQ("noise_monitor", proc_get_nm, proc_set_nm),
 #endif
-#if defined(CONFIG_RTKM) && defined(CONFIG_PREALLOC_RX_SKB_BUFFER)
-	RTW_PROC_HDL_SSEQ("rtkm_skb", proc_get_rtkm_skb, NULL),
+
+#ifdef CONFIG_PREALLOC_RX_SKB_BUFFER
+	RTW_PROC_HDL_SSEQ("rtkm_info", proc_get_rtkm_info, NULL),
 #endif
 	RTW_PROC_HDL_SSEQ("efuse_map", proc_get_efuse_map, NULL),
 #ifdef CONFIG_IEEE80211W

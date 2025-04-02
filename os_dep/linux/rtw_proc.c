@@ -3445,7 +3445,7 @@ static void rtw_set_tx_bw_mode(struct _ADAPTER *adapter, u8 bw_mode)
 		for (i = 0; i < MACID_NUM_SW_LIMIT; i++) {
 			sta = macid_ctl->sta[i];
 			if (sta && !is_broadcast_mac_addr(sta->cmn.mac_addr))
-				rtw_dm_ra_mask_wk_cmd(adapter, (u8 *)sta);
+				rtw_dm_ra_mask_wk_cmd(adapter, sta);
 		}
 	}
 }

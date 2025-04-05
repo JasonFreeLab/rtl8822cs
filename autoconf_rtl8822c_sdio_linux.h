@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2015 - 2017 Realtek Corporation.
+ * Copyright(c) 2015 - 2022 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -12,11 +12,13 @@
  * more details.
  *
  *****************************************************************************/
+#define CONFIG_SINGLE_IMG
+/* #define CONFIG_DISABLE_ODM */
+
 /*
- * Public General Config
+ * Public  General Config
  */
 #define AUTOCONF_INCLUDED
-
 #define RTL871X_MODULE_NAME "88x2CS"
 #define DRV_NAME "rtl88x2cs"
 
@@ -24,16 +26,12 @@
 #ifndef CONFIG_RTL8822C
 #define CONFIG_RTL8822C
 #endif
-#define CONFIG_SDIO_HCI
-#define PLATFORM_LINUX
-
+#define CONFIG_SDIO_HCI	1
+#define PLATFORM_LINUX	1
 
 /*
  * Wi-Fi Functions Config
  */
-
-#define CONFIG_RECV_REORDERING_CTRL
-
 #define CONFIG_80211N_HT
 #define CONFIG_80211AC_VHT
 #ifdef CONFIG_80211AC_VHT
@@ -42,7 +40,11 @@
 	#endif
 #endif
 
-/* Set CONFIG_IOCTL_CFG80211 from Makefile */
+#ifdef CONFIG_80211AC_VHT
+	#define CONFIG_BEAMFORMING
+#endif
+
+/* set CONFIG_IOCTL_CFG80211 from Makefile */
 #ifdef CONFIG_IOCTL_CFG80211
 	/*
 	 * Indecate new sta asoc through cfg80211_new_sta
@@ -51,39 +53,127 @@
 	 * RTW_USE_CFG80211_STA_EVENT must be defiend!
 	 */
 	/* Set RTW_USE_CFG80211_STA_EVENT from Makefile */
+	/* #define RTW_USE_CFG80211_STA_EVENT */ /* Indecate new sta asoc through cfg80211_new_sta */
 	#define CONFIG_CFG80211_FORCE_COMPATIBLE_2_6_37_UNDER
-	/*#define CONFIG_DEBUG_CFG80211*/
+	/* #define CONFIG_DEBUG_CFG80211 */
+	/* #define CONFIG_DRV_ISSUE_PROV_REQ */ /* IOT FOR S2 */
 	#define CONFIG_SET_SCAN_DENY_TIMER
 #endif /* CONFIG_IOCTL_CFG80211 */
 
+/*
+ * Internal  General Config
+ */
+/* #define CONFIG_H2CLBK */
+
+/*
+ * Software feature Related Config
+ */
+#define RTW_HALMAC		/* Use HALMAC architecture, necessary for 8822B */
+
+#define CONFIG_EMBEDDED_FWIMG	1
+#ifdef CONFIG_EMBEDDED_FWIMG
+	#define	LOAD_FW_HEADER_FROM_DRIVER
+#endif
+/* #define CONFIG_FILE_FWIMG */
+#define CONFIG_LONG_DELAY_ISSUE
+
+#define CONFIG_XMIT_ACK
+#ifdef CONFIG_XMIT_ACK
+	#define CONFIG_ACTIVE_KEEP_ALIVE_CHECK
+#endif
+
+#define CONFIG_RECV_REORDERING_CTRL	1
+
+#ifdef CONFIG_POWER_SAVING
+	#define CONFIG_IPS	1
+	#ifdef CONFIG_IPS
+		#define CONFIG_IPS_CHECK_IN_WD /* Do IPS Check in WatchDog.	*/
+		/* #define CONFIG_FWLPS_IN_IPS */
+	#endif /* CONFIG_IPS */
+	/* #define SUPPORT_HW_RFOFF_DETECTED	1 */
+
+	#define CONFIG_LPS	1
+	#if defined(CONFIG_LPS) && (defined(CONFIG_GSPI_HCI) || defined(CONFIG_SDIO_HCI) || defined(CONFIG_USB_HCI))
+		#define CONFIG_LPS_LCLK	1
+	#endif
+
+	#ifdef CONFIG_LPS
+		#define CONFIG_CHECK_LEAVE_LPS
+		#ifndef CONFIG_PLATFORM_INTEL_BYT
+		#define CONFIG_LPS_SLOW_TRANSITION
+		#endif /* !CONFIG_PLATFORM_INTEL_BYT */
+	#endif
+
+	#ifdef CONFIG_LPS_LCLK
+		#define CONFIG_DETECT_CPWM_BY_POLLING
+		#define DBG_CHECK_FW_PS_STATE
+		#define CONFIG_LPS_RPWM_TIMER
+	#if defined(CONFIG_LPS_RPWM_TIMER) || defined(CONFIG_DETECT_CPWM_BY_POLLING)
+		#define LPS_RPWM_WAIT_MS 300
+	#endif
+		#define CONFIG_LPS_LCLK_WD_TIMER /* Watch Dog timer in LPS LCLK */
+		/* #define CONFIG_LPS_PG */
+	#endif /* CONFIG_LPS_LCLK */
+
+	#ifdef CONFIG_IPS
+		#define CONFIG_IPS_CHECK_IN_WD /* Do IPS Check in WatchDog. */
+		/*#define CONFIG_SWLPS_IN_IPS*/ /* Do SW LPS flow when entering and leaving IPS */
+		/*#define CONFIG_FWLPS_IN_IPS*/ /* issue H2C command to let FW do LPS when entering IPS */
+	#endif /* CONFIG_LPS */
+
+	#ifdef CONFIG_LPS
+		#define CONFIG_WMMPS_STA 1
+	#endif /* CONFIG_LPS */
+#endif /* CONFIG_POWER_SAVING */
+
+/* before link */
+/* #define CONFIG_ANTENNA_DIVERSITY */
+/* after link */
+#ifdef CONFIG_ANTENNA_DIVERSITY
+	#define CONFIG_HW_ANTENNA_DIVERSITY
+#endif
+
 #ifdef CONFIG_AP_MODE
+	/* #define CONFIG_INTERRUPT_BASED_TXBCN */ /* Tx Beacon when driver BCN_OK ,BCN_ERR interrupt occurs */
+	#if defined(CONFIG_CONCURRENT_MODE) && defined(CONFIG_INTERRUPT_BASED_TXBCN)
+		#undef CONFIG_INTERRUPT_BASED_TXBCN
+	#endif
+	#ifdef CONFIG_INTERRUPT_BASED_TXBCN
+		/* #define CONFIG_INTERRUPT_BASED_TXBCN_EARLY_INT */
+		#define CONFIG_INTERRUPT_BASED_TXBCN_BCN_OK_ERR
+	#endif
+
 	#define CONFIG_NATIVEAP_MLME
 	#ifndef CONFIG_NATIVEAP_MLME
-		#define CONFIG_HOSTAPD_MLME
+		#define CONFIG_HOSTAPD_MLME	1
 	#endif
-	/*#define CONFIG_FIND_BEST_CHANNEL*/
+	#define CONFIG_FIND_BEST_CHANNEL	1
 #endif
 
 #ifdef CONFIG_P2P
-	#define CONFIG_WFD	/* Wi-Fi display */
+	/* The CONFIG_WFD is for supporting the Wi-Fi display */
+	#define CONFIG_WFD
+
 	#define CONFIG_P2P_REMOVE_GROUP_INFO
-	/*#define CONFIG_DBG_P2P*/
+
+	/* #define CONFIG_DBG_P2P */
+
 	#define CONFIG_P2P_PS
-	/*#define CONFIG_P2P_IPS*/
+	/* #define CONFIG_P2P_IPS */
 	#define CONFIG_P2P_OP_CHK_SOCIAL_CH
-	#define CONFIG_CFG80211_ONECHANNEL_UNDER_CONCURRENT  /* Replace CONFIG_P2P_CHK_INVITE_CH_LIST flag */
+	#define CONFIG_CFG80211_ONECHANNEL_UNDER_CONCURRENT  /* replace CONFIG_P2P_CHK_INVITE_CH_LIST flag */
 	/*#define CONFIG_P2P_INVITE_IOT*/
 #endif /* CONFIG_P2P */
 
 /* Set CONFIG_TDLS from Makefile */
 #ifdef CONFIG_TDLS
 	#define CONFIG_TDLS_DRIVER_SETUP
-#if 0
+/*
 	#ifndef CONFIG_WFD
 		#define CONFIG_WFD
 	#endif
-	#define CONFIG_TDLS_AUTOSETUP
-#endif
+*/
+	/* #define CONFIG_TDLS_AUTOSETUP */
 	#define CONFIG_TDLS_AUTOCHECKALIVE
 	/*
 	 * Enable "CONFIG_TDLS_CH_SW" by default,
@@ -93,9 +183,9 @@
 	#define CONFIG_TDLS_CH_SW
 #endif /* CONFIG_TDLS */
 
-/*#define CONFIG_RTW_80211K*/
 
 #define CONFIG_BEAMFORMING
+#define CONFIG_SKB_COPY		/* for amsdu */
 
 
 /*
@@ -106,31 +196,24 @@
 /*#define SUPPORT_HW_RFOFF_DETECTED*/
 /*#define CONFIG_RTW_LED*/
 #ifdef CONFIG_RTW_LED
-	/*#define CONFIG_RTW_SW_LED*/
+	#define CONFIG_RTW_SW_LED
+	#ifdef CONFIG_RTW_SW_LED
+		/* #define CONFIG_RTW_LED_HANDLED_BY_CMD_THREAD */
+	#endif
 #endif /* CONFIG_RTW_LED */
-
-#define CONFIG_XMIT_ACK
-#ifdef CONFIG_XMIT_ACK
-	#define CONFIG_ACTIVE_KEEP_ALIVE_CHECK
-#endif
-
-
-#define DISABLE_BB_RF		0
-#define RTW_NOTCH_FILTER	0 /* 0:Disable, 1:Enable */
 
 #define CONFIG_SUPPORT_TRX_SHARED
 #ifdef CONFIG_SUPPORT_TRX_SHARED
 #define DFT_TRX_SHARE_MODE	2
 #endif
 
-/*
- * Software feature Related Config
- */
-#define RTW_HALMAC		/* Use HALMAC architecture, necessary for 8822B */
+
 #define CONFIG_RECV_THREAD_MODE
 #ifdef CONFIG_RECV_THREAD_MODE
 #define RTW_RECV_THREAD_HIGH_PRIORITY
 #endif/*CONFIG_RECV_THREAD_MODE*/
+
+#define RTW_NOTCH_FILTER	0 /* 0:Disable, 1:Enable */
 
 /*
  * Interface Related Config
@@ -151,34 +234,20 @@
 /*
  * Others
  */
-/* #define CONFIG_MAC_LOOPBACK_DRIVER */
-#define CONFIG_SKB_COPY		/* for amsdu */
 #define CONFIG_NEW_SIGNAL_STAT_PROCESS
-#define CONFIG_EMBEDDED_FWIMG
-#ifdef CONFIG_EMBEDDED_FWIMG
-	#define	LOAD_FW_HEADER_FROM_DRIVER
-#endif
-/*#define CONFIG_FILE_FWIMG*/
-#define CONFIG_LONG_DELAY_ISSUE
 
 #ifdef CONFIG_RTW_NAPI
 /*#define CONFIG_RTW_NAPI_DYNAMIC*/
 #define CONFIG_RTW_NAPI_V2
 #endif
 
-/*
- * Platform
- */
-#ifdef CONFIG_PLATFORM_INTEL_BYT
-#ifdef CONFIG_CFG80211_FORCE_COMPATIBLE_2_6_37_UNDER
-#undef CONFIG_CFG80211_FORCE_COMPATIBLE_2_6_37_UNDER
-#endif
-#endif /* CONFIG_PLATFORM_INTEL_BYT */
+
 
 
 /*
  * Auto Config Section
  */
+ /* #define CONFIG_MAC_LOOPBACK_DRIVER */
 #ifdef CONFIG_MAC_LOOPBACK_DRIVER
 #undef CONFIG_IOCTL_CFG80211
 #undef CONFIG_AP_MODE
@@ -189,53 +258,24 @@
 #undef SUPPORT_HW_RFOFF_DETECTED
 #endif /* CONFIG_MAC_LOOPBACK_DRIVER */
 
+#define DISABLE_BB_RF	0
+
 #ifdef CONFIG_MP_INCLUDED
 	#define MP_DRIVER	1
-	#define CONFIG_MP_IWPRIV_SUPPORT
+	#define CONFIG_MP_IWPRIV_SUPPORT	1
 #else /* !CONFIG_MP_INCLUDED */
 	#define MP_DRIVER	0
 	#undef CONFIG_MP_IWPRIV_SUPPORT
 #endif /* !CONFIG_MP_INCLUDED */
 
-#ifdef CONFIG_POWER_SAVING
-	#define CONFIG_IPS
-	#ifdef CONFIG_IPS
-		/* #define CONFIG_FWLPS_IN_IPS */
-	#endif /* CONFIG_IPS */
-
-	#define CONFIG_LPS
-	#if defined(CONFIG_LPS) && (defined(CONFIG_GSPI_HCI) || defined(CONFIG_SDIO_HCI))
-	#define CONFIG_LPS_LCLK
-	#endif
-
-	#ifdef CONFIG_LPS
-		#define CONFIG_CHECK_LEAVE_LPS
-		#ifndef CONFIG_PLATFORM_INTEL_BYT
-		#define CONFIG_LPS_SLOW_TRANSITION
-		#endif /* !CONFIG_PLATFORM_INTEL_BYT */
-	#endif
-
-	#ifdef CONFIG_LPS_LCLK
-	#define CONFIG_DETECT_CPWM_BY_POLLING
-	#define DBG_CHECK_FW_PS_STATE
-	#define CONFIG_LPS_RPWM_TIMER
-	#if defined(CONFIG_LPS_RPWM_TIMER) || defined(CONFIG_DETECT_CPWM_BY_POLLING)
-	#define LPS_RPWM_WAIT_MS 300
-	#endif
-	#define CONFIG_LPS_LCLK_WD_TIMER /* Watch Dog timer in LPS LCLK */
-	/* #define CONFIG_LPS_PG */
-	#endif
-
-	#ifdef CONFIG_IPS
-	#define CONFIG_IPS_CHECK_IN_WD /* Do IPS Check in WatchDog. */
-	/*#define CONFIG_SWLPS_IN_IPS*/ /* Do SW LPS flow when entering and leaving IPS */
-	/*#define CONFIG_FWLPS_IN_IPS*/ /* issue H2C command to let FW do LPS when entering IPS */
-	#endif
-
-	#ifdef CONFIG_LPS
-		#define CONFIG_WMMPS_STA 1
-	#endif /* CONFIG_LPS */
-#endif /* CONFIG_POWER_SAVING */
+/*
+ * Platform  Related Config
+ */
+#ifdef CONFIG_PLATFORM_INTEL_BYT
+#ifdef CONFIG_CFG80211_FORCE_COMPATIBLE_2_6_37_UNDER
+#undef CONFIG_CFG80211_FORCE_COMPATIBLE_2_6_37_UNDER
+#endif
+#endif /* CONFIG_PLATFORM_INTEL_BYT */
 
 #ifdef CONFIG_BT_COEXIST
 	/* for ODM and outsrc BT-Coex */
@@ -254,11 +294,6 @@
 #endif /* CONFIG_GPIO_WAKEUP */
 
 
-#ifdef CONFIG_ANTENNA_DIVERSITY
-#define CONFIG_HW_ANTENNA_DIVERSITY
-#endif /* CONFIG_ANTENNA_DIVERSITY */
-
-
 /*
  * Debug Related Config
  */
@@ -269,13 +304,35 @@
 #endif /* !CONFIG_RTW_DEBUG */
 
 #define DBG_CONFIG_ERROR_DETECT
-#if 0
+
+/*
+#define DBG_CONFIG_ERROR_DETECT_INT
+#define DBG_CONFIG_ERROR_RESET
+
+#define DBG_IO
+#define DBG_DELAY_OS
+#define DBG_MEM_ALLOC
+#define DBG_IOCTL
+
+#define DBG_TX
 #define DBG_XMIT_BUF
 #define DBG_XMIT_BUF_EXT
-#define CONFIG_FW_C2H_DEBUG
-#endif
+#define DBG_TX_DROP_FRAME
+
+#define DBG_RX_DROP_FRAME
+#define DBG_RX_SEQ
+#define DBG_RX_SIGNAL_DISPLAY_PROCESSING
+#define DBG_RX_SIGNAL_DISPLAY_SSID_MONITORED "jeff-ap"
 
 
-/* #define CONFIG_DISABLE_ODM */
+
+#define DBG_SHOW_MCUFWDL_BEFORE_51_ENABLE
+#define DBG_ROAMING_TEST
+
+#define DBG_HAL_INIT_PROFILING
+
+#define DBG_MEMORY_LEAK	1
+*/
+
 /* #define CONFIG_NO_FW */
-
+/* #define CONFIG_DISABLE_ODM */

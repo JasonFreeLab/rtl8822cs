@@ -7,8 +7,8 @@ else
   echo "About to run dkms install steps..."
 fi
 
-DRV_DIR=rtl88x2cs
-DRV_NAME=rtl88x2cs
+DRV_DIR=rtl88x2cu
+DRV_NAME=rtl88x2cu
 DRV_VERSION=5.15.8.6
 
 cp -r $(pwd) /usr/src/${DRV_NAME}-${DRV_VERSION}

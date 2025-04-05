@@ -5037,6 +5037,196 @@ s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 fail:
 	rtw_skb_free(skb);
 	return NETDEV_TX_OK;
+
+/*
+	I've seen that Realtek has made some effort 
+	to make the packet injection work properly, 
+	but I'd just paste the proved code here. 
+	The original codes are here below. 
+*/
+
+/*
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(ndev);
+	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct pkt_attrib *pattrib;
+	struct xmit_frame *pmgntframe;
+	struct mlme_ext_priv *pmlmeext = &(padapter->mlmeextpriv);
+	struct xmit_priv *pxmitpriv = &(padapter->xmitpriv);
+	unsigned char *pframe;
+	u16 frame_ctl;
+	u8 retry_ctrl = _FALSE;
+	u8 fixed_rate = MGN_1M;
+	u8 sgi = 0;
+	u8 bwidth = CHANNEL_WIDTH_20;
+	u8 ldpc = 0;
+	u8 stbc = 0;
+#ifndef CONFIG_CUSTOMER_ALIBABA_GENERAL
+	struct ieee80211_radiotap_header *rtap_hdr;
+	struct ieee80211_radiotap_iterator iterator;
+	int rtap_len;
+	int ret;
+#endif
+
+	rtw_mstat_update(MSTAT_TYPE_SKB, MSTAT_ALLOC_SUCCESS, skb->truesize);
+
+#ifndef CONFIG_CUSTOMER_ALIBABA_GENERAL
+	if (unlikely(skb->len < sizeof(struct ieee80211_radiotap_header)))
+		goto no_rtap_tx;
+
+	rtap_hdr = (struct ieee80211_radiotap_header *)skb->data;
+	if (unlikely(rtap_hdr->it_version))
+		goto no_rtap_tx;
+
+	rtap_len = ieee80211_get_radiotap_len(skb->data);
+	if (unlikely(skb->len < rtap_len))
+		goto no_rtap_tx;
+
+	ret = ieee80211_radiotap_iterator_init(&iterator, rtap_hdr, skb->len, NULL);
+	while (!ret) {
+		ret = ieee80211_radiotap_iterator_next(&iterator);
+
+		if (ret)
+			continue;
+
+		// see if this argument is something we can use 
+		switch (iterator.this_arg_index) {
+		case IEEE80211_RADIOTAP_RATE:
+			fixed_rate = *iterator.this_arg;
+			break;
+
+		case IEEE80211_RADIOTAP_TX_FLAGS: {
+			u16 txflags;
+			txflags = get_unaligned_le16(iterator.this_arg);
+			if ((txflags & IEEE80211_RADIOTAP_F_TX_NOACK) == 0)
+				retry_ctrl = _TRUE;
+			break;
+		}
+
+		case IEEE80211_RADIOTAP_MCS: {
+			u8 mcs_known = iterator.this_arg[0];
+			u8 mcs_flags = iterator.this_arg[1];
+			if (!(mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_MCS))
+				break;
+
+			fixed_rate = iterator.this_arg[2] & 0x7f;
+
+			if (mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_MCS) {
+				fixed_rate = iterator.this_arg[2] & 0x7f;
+				if (fixed_rate > 31)
+					fixed_rate = 0;
+				fixed_rate += MGN_MCS0;
+			}
+			if ((mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_GI) &&
+			    (mcs_flags & IEEE80211_RADIOTAP_MCS_SGI))
+				sgi = 1;
+			if ((mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_BW) &&
+			    (mcs_flags & IEEE80211_RADIOTAP_MCS_BW_40))
+				bwidth = CHANNEL_WIDTH_40;
+			if ((mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_FEC) &&
+			    (mcs_flags & IEEE80211_RADIOTAP_MCS_FEC_LDPC))
+				ldpc = 1;
+			if ((mcs_known & IEEE80211_RADIOTAP_MCS_HAVE_STBC)) {
+				stbc = (mcs_flags &
+					IEEE80211_RADIOTAP_MCS_STBC_MASK) >>
+				       IEEE80211_RADIOTAP_MCS_STBC_SHIFT;
+			}
+			break;
+		}
+
+		case IEEE80211_RADIOTAP_VHT: {
+			u16 vht_known = get_unaligned_le16(iterator.this_arg);
+			u8 vht_flags = iterator.this_arg[2];
+			unsigned int mcs, nss;
+
+			if ((vht_known & IEEE80211_RADIOTAP_VHT_KNOWN_GI) &&
+			    (vht_flags & IEEE80211_RADIOTAP_VHT_FLAG_SGI))
+				sgi = 1;
+			if (vht_known &
+			    IEEE80211_RADIOTAP_VHT_KNOWN_BANDWIDTH) {
+				bwidth = iterator.this_arg[3] & 0x1f;
+				if(bwidth >= 1 && bwidth <= 3)
+					bwidth = CHANNEL_WIDTH_40;
+				else if(bwidth >= 4 && bwidth <= 10)
+					bwidth = CHANNEL_WIDTH_80;
+				else
+					bwidth = CHANNEL_WIDTH_20;
+			}
+			if((vht_known & IEEE80211_RADIOTAP_VHT_KNOWN_STBC) &&
+			   (vht_flags & IEEE80211_RADIOTAP_VHT_FLAG_STBC))
+				stbc = 1;
+			if (vht_known & IEEE80211_RADIOTAP_VHT_KNOWN_LDPC_EXTRA_OFDM_SYM &&
+			    vht_flags & IEEE80211_RADIOTAP_VHT_FLAG_LDPC_EXTRA_OFDM_SYM &&
+			    iterator.this_arg[8] & 0x0f)
+				ldpc = 1;
+			mcs = (iterator.this_arg[4] >> 4) & 0x0f;
+			nss = iterator.this_arg[4] & 0x0f;
+			if(nss > 0) {
+				if(nss > 4) nss = 4;
+				if(mcs > 9) mcs = 9;
+				fixed_rate = MGN_VHT1SS_MCS0 + ((nss - 1) * 10 + mcs);
+			}
+			break;
+		}
+
+		default:
+			break;
+		}
+	}
+
+	// Skip the ratio tap header 
+	skb_pull(skb, rtap_len);
+
+no_rtap_tx:
+#endif
+
+	pmgntframe = monitor_alloc_mgtxmitframe(pxmitpriv);
+	if (unlikely(pmgntframe == NULL)) {
+		DBG_COUNTER(padapter->tx_logs.core_tx_err_pxmitframe);
+		pxmitpriv->tx_drop++;
+		goto fail;
+	}
+	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
+
+	skb_copy_bits(skb, 0, (void*)pframe, skb->len);
+
+	pattrib = &pmgntframe->attrib;
+
+	// Check DATA/MGNT frames 
+	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	frame_ctl = le16_to_cpu(pwlanhdr->frame_ctl);
+	update_monitor_frame_attrib(padapter, &pmgntframe->attrib);
+	if ((frame_ctl & RTW_IEEE80211_FCTL_FTYPE) == RTW_IEEE80211_FTYPE_DATA)
+		update_monitor_frame_attrib(padapter, &pmgntframe->attrib);
+	else
+		update_mgntframe_attrib(padapter, &pmgntframe->attrib);
+	
+	pattrib->pktlen = skb->len;
+	pattrib->rate = fixed_rate;
+	pattrib->retry_ctrl = retry_ctrl;
+	pmlmeext->mgnt_seq = GetSequence(pwlanhdr);
+	pattrib->seqnum = pmlmeext->mgnt_seq;
+	pmlmeext->mgnt_seq++;
+	pattrib->last_txcmdsz = pattrib->pktlen;
+	pattrib->sgi = sgi;
+	pattrib->bwmode = bwidth;
+	pattrib->ldpc = ldpc;
+	pattrib->stbc = stbc;
+
+	if (unlikely(dump_mgntframe(padapter, pmgntframe) != _SUCCESS))
+	{
+		pxmitpriv->tx_drop++;
+		goto fail;
+	}
+
+	DBG_COUNTER(padapter->tx_logs.core_tx);
+	pxmitpriv->tx_pkts++;
+	pxmitpriv->tx_bytes += skb->len;
+
+fail:
+	rtw_skb_free(skb);
+	return 0;
+*/
 }
 #endif
 

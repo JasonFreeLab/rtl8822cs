@@ -32,7 +32,6 @@
 /*
  * Wi-Fi Functions Config
  */
-
 #define CONFIG_80211N_HT
 #define CONFIG_80211AC_VHT
 #ifdef CONFIG_80211AC_VHT
@@ -59,19 +58,24 @@
 	/* #define CONFIG_DEBUG_CFG80211 */
 	/* #define CONFIG_DRV_ISSUE_PROV_REQ */ /* IOT FOR S2 */
 	#define CONFIG_SET_SCAN_DENY_TIMER
-#endif
+#endif /* CONFIG_IOCTL_CFG80211 */
 
 /*
  * Internal  General Config
  */
 /* #define CONFIG_H2CLBK */
 
+/*
+ * Software feature Related Config
+ */
 #define RTW_HALMAC		/* Use HALMAC architecture, necessary for 8822B */
+
 #define CONFIG_EMBEDDED_FWIMG	1
-#if (CONFIG_EMBEDDED_FWIMG==1)
+#ifdef CONFIG_EMBEDDED_FWIMG
 	#define	LOAD_FW_HEADER_FROM_DRIVER
 #endif
 /* #define CONFIG_FILE_FWIMG */
+#define CONFIG_LONG_DELAY_ISSUE
 
 #define CONFIG_XMIT_ACK
 #ifdef CONFIG_XMIT_ACK
@@ -94,8 +98,15 @@
 	/* #define SUPPORT_HW_RFOFF_DETECTED	1 */
 
 	#define CONFIG_LPS	1
-	#if defined(CONFIG_LPS)
+	#if defined(CONFIG_LPS) && (defined(CONFIG_GSPI_HCI) || defined(CONFIG_SDIO_HCI) || defined(CONFIG_USB_HCI))
 		#define CONFIG_LPS_LCLK	1
+	#endif
+
+	#ifdef CONFIG_LPS
+		#define CONFIG_CHECK_LEAVE_LPS
+		#ifndef CONFIG_PLATFORM_INTEL_BYT
+		#define CONFIG_LPS_SLOW_TRANSITION
+		#endif /* !CONFIG_PLATFORM_INTEL_BYT */
 	#endif
 
 	#ifdef CONFIG_LPS_LCLK
@@ -113,19 +124,14 @@
 	#ifdef CONFIG_LPS
 		#define CONFIG_WMMPS_STA 1
 	#endif /* CONFIG_LPS */
-#endif /*CONFIG_POWER_SAVING*/
-	/* before link */
-	/* #define CONFIG_ANTENNA_DIVERSITY */
+#endif /* CONFIG_POWER_SAVING */
 
-	/* after link */
-	#ifdef CONFIG_ANTENNA_DIVERSITY
+/* before link */
+/* #define CONFIG_ANTENNA_DIVERSITY */
+/* after link */
+#ifdef CONFIG_ANTENNA_DIVERSITY
 	#define CONFIG_HW_ANTENNA_DIVERSITY
-	#endif
-
-
-/*#else*/	/* CONFIG_MP_INCLUDED */
-
-/*#endif*/	/* CONFIG_MP_INCLUDED */
+#endif
 
 #ifdef CONFIG_AP_MODE
 	/* #define CONFIG_INTERRUPT_BASED_TXBCN */ /* Tx Beacon when driver BCN_OK ,BCN_ERR interrupt occurs */
@@ -157,9 +163,9 @@
 	#define CONFIG_P2P_OP_CHK_SOCIAL_CH
 	#define CONFIG_CFG80211_ONECHANNEL_UNDER_CONCURRENT  /* replace CONFIG_P2P_CHK_INVITE_CH_LIST flag */
 	/*#define CONFIG_P2P_INVITE_IOT*/
-#endif
+#endif /* CONFIG_P2P */
 
-/*	Added by Kurt 20110511 */
+/* Set CONFIG_TDLS from Makefile */
 #ifdef CONFIG_TDLS
 	#define CONFIG_TDLS_DRIVER_SETUP
 /*
@@ -169,13 +175,26 @@
 */
 	/* #define CONFIG_TDLS_AUTOSETUP */
 	#define CONFIG_TDLS_AUTOCHECKALIVE
-	#define CONFIG_TDLS_CH_SW		/* Enable "CONFIG_TDLS_CH_SW" by default, however limit it to only work in wifi logo test mode but not in normal mode currently */
-#endif
+	/*
+	 * Enable "CONFIG_TDLS_CH_SW" by default,
+	 * however limit it to only work in wifi logo test mode
+	 * but not in normal mode currently
+	 */
+	#define CONFIG_TDLS_CH_SW
+#endif /* CONFIG_TDLS */
 
 
-#define CONFIG_SKB_COPY	1 /* amsdu */
+#define CONFIG_BEAMFORMING
+#define CONFIG_SKB_COPY		/* for amsdu */
 
-/* #define CONFIG_RTW_LED */
+
+/*
+ * Hareware/Firmware Related Config
+ */
+/* Set CONFIG_BT_COEXIST from Makefile */
+/*#define CONFIG_ANTENNA_DIVERSITY*/
+/*#define SUPPORT_HW_RFOFF_DETECTED*/
+/*#define CONFIG_RTW_LED*/
 #ifdef CONFIG_RTW_LED
 	#define CONFIG_RTW_SW_LED
 	#ifdef CONFIG_RTW_SW_LED
@@ -196,13 +215,12 @@
 #ifdef CONFIG_SIGNAL_DISPLAY_DBM
 /* #define CONFIG_BACKGROUND_NOISE_MONITOR */
 #endif
-#define RTW_NOTCH_FILTER 0 /* 0:Disable, 1:Enable, */
 
+#define RTW_NOTCH_FILTER	0 /* 0:Disable, 1:Enable */
 
 /*
- * Interface  Related Config
+ * Interface Related Config
  */
-
 #ifndef CONFIG_MINIMAL_MEMORY_USAGE
 	#define CONFIG_USB_TX_AGGREGATION	1
 	#define CONFIG_USB_RX_AGGREGATION	1
@@ -258,15 +276,16 @@
 #define DISABLE_BB_RF	0
 
 #ifdef CONFIG_MP_INCLUDED
-	#define MP_DRIVER 1
+	#define MP_DRIVER	1
 	#define CONFIG_MP_IWPRIV_SUPPORT	1
 	/*
 	 #undef CONFIG_USB_TX_AGGREGATION
 	 #undef CONFIG_USB_RX_AGGREGATION
 	*/
-#else
-	#define MP_DRIVER 0
-#endif
+#else /* !CONFIG_MP_INCLUDED */
+	#define MP_DRIVER	0
+	#undef CONFIG_MP_IWPRIV_SUPPORT
+#endif /* !CONFIG_MP_INCLUDED */
 
 /*
  * Platform  Related Config
@@ -296,16 +315,17 @@
 /* #define CONFIG_TX_EARLY_MODE */
 #endif
 
-#define	RTL8188E_EARLY_MODE_PKT_NUM_10	0
 
 /*
  * Debug Related Config
  */
-#define DBG	1
+#ifdef CONFIG_RTW_DEBUG
+#define DBG	1	/* for ODM & BTCOEX debug */
+#else /* !CONFIG_RTW_DEBUG */
+#define DBG	0	/* for ODM & BTCOEX debug */
+#endif /* !CONFIG_RTW_DEBUG */
 
 #define DBG_CONFIG_ERROR_DETECT
-#define DBG_CONFIG_ERROR_RESET
-#define RTW_DETECT_HANG
 
 /*
 #define DBG_CONFIG_ERROR_DETECT_INT

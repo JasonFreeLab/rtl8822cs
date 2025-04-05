@@ -1,4 +1,4 @@
-config RTL8822CS
-	tristate "Realtek 8822C SDIO WiFi"
+config RTL8822CU
+	tristate "Realtek 8822C USB WiFi"
 	help
-	  Help message of RTL8822CS
+	  Help message of RTL8822CU
